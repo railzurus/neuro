@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { MANIFESTO, RITUAL, ROLES } from '../data/roles'
+import { RoleIconTile } from '../components/RoleIcon'
 
 export default function Intro() {
   return (
@@ -81,8 +82,8 @@ export default function Intro() {
               key={r.id}
               className="rounded-2xl glass p-4 transition-transform hover:-translate-y-1"
             >
-              <div className="text-2xl">{r.glyph}</div>
-              <div className="mt-2 font-medium text-ink-900">{r.title}</div>
+              <RoleIconTile id={r.id} />
+              <div className="mt-3 font-medium text-ink-900">{r.title}</div>
               <div className="text-xs text-ink-400">{r.tagline}</div>
             </div>
           ))}

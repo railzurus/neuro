@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Wand2, Loader2 } from 'lucide-react'
 import { ROLES, WORD_LIMIT } from '../data/roles'
 import { useStore } from '../store/useStore'
 import { refineText, wordCount } from '../lib/refine'
+import { RoleIconTile } from '../components/RoleIcon'
 
 export default function Compose() {
   const navigate = useNavigate()
@@ -84,7 +85,7 @@ export default function Compose() {
       {/* Assistant question bubble */}
       <div className="animate-fadeup" key={role.id}>
         <div className="mb-2 flex items-center gap-3">
-          <span className="text-3xl">{role.glyph}</span>
+          <RoleIconTile id={role.id} size="lg" />
           <div>
             <h1 className="font-serif text-3xl text-ink-900">{role.title}</h1>
             <p className="text-sm text-ink-400">{role.tagline}</p>
