@@ -10,7 +10,7 @@ export default function Intro() {
         <div className="pointer-events-none absolute left-1/2 top-6 -z-10 h-56 w-56 -translate-x-1/2 rounded-full bg-blob-clay/70 blur-3xl animate-breathe" />
         <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/70 px-4 py-1.5 text-xs text-ink-600 shadow-soft">
           <Sparkles className="h-3.5 w-3.5 text-gold" />
-          Метод Лизы Головиной · ZURUS Tech
+          Метод Лизы Головиной
         </div>
         <h1 className="font-serif text-5xl sm:text-6xl leading-[1.05] text-ink-900 animate-fadeup">
           Прояви жизнь

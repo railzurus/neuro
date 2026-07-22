@@ -34,7 +34,15 @@ export default function App() {
 
       <footer className="w-full">
         <div className="mx-auto max-w-5xl px-6 py-8 text-center text-xs text-ink-400">
-          Создано Лизой Головиной · запрограммировано Романом Бабашкиным и ZURUS Tech
+          Сервис разработан компанией{' '}
+          <a
+            href="https://zurus.tech/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand hover:underline"
+          >
+            ZURUS
+          </a>
         </div>
       </footer>
     </div>
