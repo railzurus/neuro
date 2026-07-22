@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+
+# Build output (собирается в CI, в репозиторий не коммитим)
+dist
+dist-ssr
+*.tsbuildinfo
+
+# Логи
+*.log
+npm-debug.log*
+
+# Редакторы / ОС
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Локальные артефакты Claude Code
+.claude/
+
+# Локальное окружение
+*.local
+.env
+.env.*
+!.env.example
