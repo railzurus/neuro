@@ -1,3 +1,6 @@
+# Наш index.html всегда приоритетнее дефолтного index.php Beget
+DirectoryIndex index.html
+
 # SPA-фолбэк: все несуществующие пути отдаём index.html,
 # чтобы React Router обрабатывал маршруты (/compose, /review, /listen)
 # и обновление страницы по прямой ссылке не давало 404.
