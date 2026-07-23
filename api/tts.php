@@ -46,6 +46,24 @@ if (!is_array($body)) {
     fail(400, 'Invalid JSON body');
 }
 
+// Диагностика: работает ли v1 с текущим ключом (после починки роли)?
+if (!empty($body['debugV1'])) {
+    $post = http_build_query([
+        'text' => 'Проверка синтеза речи на версии один.',
+        'lang' => 'ru-RU', 'voice' => 'alena', 'format' => 'mp3', 'folderId' => $folderId,
+    ]);
+    $c = curl_init('https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize');
+    curl_setopt_array($c, [
+        CURLOPT_POST => true, CURLOPT_POSTFIELDS => $post, CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Api-Key ' . $apiKey, 'Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    $r = curl_exec($c); $st = (int) curl_getinfo($c, CURLINFO_HTTP_CODE); curl_close($c);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['v1_status' => $st, 'v1_is_audio' => ($r !== false && substr((string) $r, 0, 1) !== '{'), 'v1_head' => substr((string) $r, 0, 200)], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $text = isset($body['text']) ? trim((string) $body['text']) : '';
 if ($text === '') {
     fail(400, 'Empty text');
