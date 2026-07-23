@@ -215,6 +215,10 @@ export function pickVoice(gender: 'female' | 'male'): SpeechSynthesisVoice | und
 /* ------------------------------------------------------------------ */
 
 export interface SessionCallbacks {
+  /** Fired while the voice is being synthesized (network) before playback. */
+  onPreparing?: () => void
+  /** Fired the moment audio actually starts. */
+  onReady?: () => void
   onProgress?: (fraction: number) => void
   onEnd?: () => void
 }
@@ -230,9 +234,114 @@ function splitSentences(text: string): string[] {
     .filter(Boolean)
 }
 
+/* ------------------------------------------------------------------ */
+/*  SpeakKit voice synthesis (real TTS → audio buffer)                 */
+/* ------------------------------------------------------------------ */
+
+const TTS_URL = '/api/tts.php'
+/** Max characters per SpeechKit request (limit is 5000; keep a safe margin). */
+const CHUNK_LIMIT = 2200
+/** Silence inserted between synthesized chunks so phrases don't run together. */
+const CHUNK_GAP = 0.35
+
+const voiceBufferCache = new Map<string, AudioBuffer>()
+
+/** Split text into request-sized chunks on sentence boundaries. */
+function chunkText(text: string, limit = CHUNK_LIMIT): string[] {
+  const sentences = splitSentences(text)
+  const chunks: string[] = []
+  let cur = ''
+  for (const s of sentences) {
+    if (s.length > limit) {
+      if (cur) {
+        chunks.push(cur)
+        cur = ''
+      }
+      for (let i = 0; i < s.length; i += limit) chunks.push(s.slice(i, i + limit))
+      continue
+    }
+    if ((cur ? cur.length + 1 : 0) + s.length > limit) {
+      if (cur) chunks.push(cur)
+      cur = s
+    } else {
+      cur = cur ? cur + ' ' + s : s
+    }
+  }
+  if (cur) chunks.push(cur)
+  return chunks
+}
+
+async function ttsChunk(
+  ctx: BaseAudioContext,
+  text: string,
+  gender: 'female' | 'male',
+): Promise<AudioBuffer> {
+  const res = await fetch(TTS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, gender }),
+  })
+  if (!res.ok) throw new Error(`tts ${res.status}`)
+  const bytes = await res.arrayBuffer()
+  return ctx.decodeAudioData(bytes)
+}
+
+/** Concatenate buffers back-to-back with a short gap between them. */
+function concatBuffers(ctx: BaseAudioContext, buffers: AudioBuffer[], gapSec: number): AudioBuffer {
+  const sr = buffers[0].sampleRate
+  const channels = Math.max(...buffers.map((b) => b.numberOfChannels))
+  const gap = Math.floor(gapSec * sr)
+  const total = buffers.reduce((n, b) => n + b.length, 0) + gap * (buffers.length - 1)
+  const out = ctx.createBuffer(channels, total, sr)
+  for (let c = 0; c < channels; c++) {
+    const data = out.getChannelData(c)
+    let offset = 0
+    buffers.forEach((b, i) => {
+      const src = b.getChannelData(Math.min(c, b.numberOfChannels - 1))
+      data.set(src, offset)
+      offset += b.length + (i < buffers.length - 1 ? gap : 0)
+    })
+  }
+  return out
+}
+
+/**
+ * Synthesize the whole text into one voice AudioBuffer via the SpeakKit proxy.
+ * Returns null on any failure (no key configured, network, decode) so callers
+ * can fall back to the browser SpeechSynthesis voice.
+ */
+export async function synthesizeVoice(
+  text: string,
+  gender: 'female' | 'male',
+): Promise<AudioBuffer | null> {
+  const key = gender + '::' + text
+  const cached = voiceBufferCache.get(key)
+  if (cached) return cached
+
+  const AC = window.AudioContext || (window as any).webkitAudioContext
+  let ctx: AudioContext | null = null
+  try {
+    ctx = new AC()
+    const chunks = chunkText(text)
+    if (!chunks.length) return null
+    const buffers: AudioBuffer[] = []
+    for (const c of chunks) buffers.push(await ttsChunk(ctx, c, gender))
+    const merged = buffers.length === 1 ? buffers[0] : concatBuffers(ctx, buffers, CHUNK_GAP)
+    voiceBufferCache.set(key, merged)
+    return merged
+  } catch {
+    return null
+  } finally {
+    if (ctx && ctx.state !== 'closed') ctx.close().catch(() => {})
+  }
+}
+
 export class MantraSession {
   private ctx: AudioContext | null = null
   private bed: BedNodes | null = null
+  private voiceSrc: AudioBufferSourceNode | null = null
+  private progressTimer: ReturnType<typeof setInterval> | null = null
+  private mode: 'buffer' | 'speech' | null = null
   private sentences: string[] = []
   private idx = 0
   private stopped = false
@@ -246,17 +355,28 @@ export class MantraSession {
     this.stop() // clean any previous run
     this.stopped = false
     this.cb = cb
-    this.sentences = splitSentences(text)
-    this.idx = 0
 
     const AC = window.AudioContext || (window as any).webkitAudioContext
     this.ctx = new AC()
 
-    // Establish the bed (real track, or binaural fallback), then let the
-    // music breathe for a moment before the voice enters.
-    this.initBed().then(() => {
-      if (this.stopped) return
-      setTimeout(() => this.speakNext(gender), VOICE_OFFSET * 1000)
+    // Prefer real SpeakKit voice (mixable + downloadable); if unavailable,
+    // fall back to the browser SpeechSynthesis voice.
+    this.cb.onPreparing?.()
+    synthesizeVoice(text, gender).then((voiceBuffer) => {
+      if (this.stopped || !this.ctx) return
+      this.initBed().then(() => {
+        if (this.stopped || !this.ctx) return
+        if (voiceBuffer) {
+          this.mode = 'buffer'
+          this.playBuffer(voiceBuffer)
+        } else {
+          this.mode = 'speech'
+          this.sentences = splitSentences(text)
+          this.idx = 0
+          this.cb.onReady?.()
+          setTimeout(() => this.speakNext(gender), VOICE_OFFSET * 1000)
+        }
+      })
     })
   }
 
@@ -269,6 +389,28 @@ export class MantraSession {
     } catch {
       if (this.stopped || !this.ctx) return
       this.bed = startBed(this.ctx) // binaural fallback
+    }
+  }
+
+  /** Play a synthesized voice buffer over the music bed (real mix). */
+  private playBuffer(buffer: AudioBuffer) {
+    if (!this.ctx) return
+    const src = this.ctx.createBufferSource()
+    src.buffer = buffer
+    src.connect(this.ctx.destination)
+    this.voiceSrc = src
+    const startAt = this.ctx.currentTime + VOICE_OFFSET
+    src.start(startAt)
+    this.cb.onReady?.()
+    const dur = buffer.duration
+    this.progressTimer = setInterval(() => {
+      if (this.stopped || !this.ctx) return
+      const t = this.ctx.currentTime - startAt
+      this.cb.onProgress?.(Math.max(0, Math.min(1, t / dur)))
+    }, 250)
+    src.onended = () => {
+      if (this.stopped) return
+      this.finish()
     }
   }
 
@@ -305,37 +447,63 @@ export class MantraSession {
   }
 
   private finish() {
+    this.clearTimer()
     this.cb.onProgress?.(1)
     this.bed?.stop(3)
     this.cb.onEnd?.()
-    setTimeout(() => this.closeCtx(), 3500)
+    this.releaseCtx(3500)
   }
 
   pause() {
-    speechSynthesis.pause()
+    if (this.mode === 'buffer') this.ctx?.suspend()
+    else speechSynthesis.pause()
   }
 
   resume() {
-    speechSynthesis.resume()
+    if (this.mode === 'buffer') this.ctx?.resume()
+    else speechSynthesis.resume()
   }
 
   stop() {
     this.stopped = true
+    this.clearTimer()
     try {
       speechSynthesis.cancel()
     } catch {
       /* ignore */
     }
+    try {
+      this.voiceSrc?.stop()
+    } catch {
+      /* already stopped */
+    }
+    this.voiceSrc = null
     this.bed?.stop(0.4)
     this.bed = null
-    setTimeout(() => this.closeCtx(), 500)
+    this.mode = null
+    this.releaseCtx(500)
   }
 
-  private closeCtx() {
-    if (this.ctx && this.ctx.state !== 'closed') {
-      this.ctx.close().catch(() => {})
+  private clearTimer() {
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer)
+      this.progressTimer = null
     }
+  }
+
+  /**
+   * Detach the current AudioContext immediately, then close it after a delay
+   * (to let fades finish). Capturing the context in a local means a later
+   * start() that creates a fresh context is never nulled by this timer.
+   */
+  private releaseCtx(delayMs: number) {
+    const ctx = this.ctx
     this.ctx = null
+    if (ctx) {
+      setTimeout(() => {
+        if (ctx.state !== 'closed') ctx.close().catch(() => {})
+      }, delayMs)
+    }
   }
 }
 

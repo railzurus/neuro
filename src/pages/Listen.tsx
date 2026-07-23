@@ -3,11 +3,17 @@ import { Link } from 'react-router-dom'
 import { Download, Loader2, Pause, Play, RotateCcw, Headphones } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { wordCount } from '../lib/refine'
-import { MantraSession, loadVoices, preloadMusic, renderMix } from '../lib/audio'
+import {
+  MantraSession,
+  loadVoices,
+  preloadMusic,
+  renderMix,
+  synthesizeVoice,
+} from '../lib/audio'
 
 const WPM = 85
 
-type PlayState = 'idle' | 'playing' | 'paused' | 'done'
+type PlayState = 'idle' | 'preparing' | 'playing' | 'paused' | 'done'
 
 export default function Listen() {
   const finalText = useStore((s) => s.finalText)
@@ -34,8 +40,9 @@ export default function Listen() {
     const session = new MantraSession()
     sessionRef.current = session
     setProgress(0)
-    setState('playing')
+    setState('preparing')
     session.start(finalText, voice, {
+      onReady: () => setState('playing'),
       onProgress: (f) => setProgress(f),
       onEnd: () => setState('done'),
     })
@@ -62,11 +69,16 @@ export default function Listen() {
     if (rendering) return
     setRendering(true)
     try {
-      const blob = await renderMix(bedSeconds)
+      // Real voice from SpeakKit if configured; otherwise music-only.
+      const voiceBuffer = await synthesizeVoice(finalText, voice)
+      const dur = voiceBuffer ? voiceBuffer.duration + 8 : bedSeconds
+      const blob = await renderMix(dur, voiceBuffer)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'alpha-волны-жизнь-мечты.wav'
+      a.download = voiceBuffer
+        ? 'жизнь-мечты-голос-и-музыка.wav'
+        : 'альфа-волны-жизнь-мечты.wav'
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -88,7 +100,15 @@ export default function Listen() {
   }
 
   const isPlaying = state === 'playing'
+  const isPreparing = state === 'preparing'
+  const animate = isPlaying || isPreparing
   const pct = Math.round(progress * 100)
+
+  function onOrbClick() {
+    if (isPreparing) return
+    if (state === 'idle' || state === 'done') play()
+    else togglePause()
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-6 pb-24 text-center">
@@ -103,21 +123,24 @@ export default function Listen() {
       <div className="relative mx-auto my-12 grid h-64 w-64 place-items-center">
         <div
           className={`absolute inset-0 rounded-full bg-gradient-to-br from-blob-clay to-blob-blush blur-2xl ${
-            isPlaying ? 'animate-breathe' : 'opacity-50'
+            animate ? 'animate-breathe' : 'opacity-50'
           }`}
         />
         <div
           className={`absolute inset-6 rounded-full border border-white bg-white/50 ${
-            isPlaying ? 'animate-breathe' : ''
+            animate ? 'animate-breathe' : ''
           }`}
         />
         <button
-          onClick={state === 'idle' || state === 'done' ? play : togglePause}
-          className="relative grid h-20 w-20 place-items-center rounded-full text-white shadow-glow transition-transform hover:scale-105"
+          onClick={onOrbClick}
+          disabled={isPreparing}
+          className="relative grid h-20 w-20 place-items-center rounded-full text-white shadow-glow transition-transform hover:scale-105 disabled:hover:scale-100"
           style={{ backgroundImage: 'linear-gradient(135deg,#c05b3a,#dd8a5f)' }}
-          aria-label={isPlaying ? 'Пауза' : 'Играть'}
+          aria-label={isPreparing ? 'Готовим' : isPlaying ? 'Пауза' : 'Играть'}
         >
-          {isPlaying ? (
+          {isPreparing ? (
+            <Loader2 className="h-8 w-8 animate-spin" />
+          ) : isPlaying ? (
             <Pause className="h-8 w-8" />
           ) : (
             <Play className="h-8 w-8 translate-x-0.5" />
@@ -135,7 +158,9 @@ export default function Listen() {
         </div>
         <div className="mt-2 flex items-center justify-center gap-2 text-xs text-ink-400">
           <Headphones className="h-3.5 w-3.5" />
-          {state === 'done'
+          {isPreparing
+            ? 'Готовим голос…'
+            : state === 'done'
             ? 'Прослушано полностью'
             : state === 'idle'
             ? `≈ ${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')} · нажмите играть`
@@ -164,8 +189,9 @@ export default function Listen() {
       <div className="mt-12 rounded-3xl glass p-8">
         <h2 className="font-serif text-2xl text-ink-900">Забрать с собой</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-ink-500 leading-relaxed">
-          Скачайте дорожку альфа-волн, чтобы слушать её каждый вечер в течение
-          30 дней. Голосовое озвучивание проигрывается здесь, в браузере.
+          Скачайте запись, чтобы слушать её каждый вечер в течение 30 дней. Если
+          подключён голос (SpeechKit) — в файле будут голос и музыка вместе; если
+          нет — только дорожка альфа-волн.
         </p>
         <button onClick={download} disabled={rendering} className="btn-primary mt-5">
           {rendering ? (
@@ -173,13 +199,8 @@ export default function Listen() {
           ) : (
             <Download className="h-4 w-4" />
           )}
-          {rendering ? 'Готовим файл…' : 'Скачать альфа-волны (WAV)'}
+          {rendering ? 'Готовим файл…' : 'Скачать запись (WAV)'}
         </button>
-        <p className="mx-auto mt-4 max-w-md text-xs text-ink-400 leading-relaxed">
-          Скоро: единый файл с вашим голосом и музыкой в студийном качестве —
-          после подключения TTS-провайдера (Yandex SpeakKit / OpenAI /
-          ElevenLabs).
-        </p>
       </div>
     </div>
   )
