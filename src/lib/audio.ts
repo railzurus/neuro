@@ -320,10 +320,12 @@ export async function synthesizeVoice(
   const cached = voiceBufferCache.get(key)
   if (cached) return cached
 
-  const AC = window.AudioContext || (window as any).webkitAudioContext
-  let ctx: AudioContext | null = null
   try {
-    ctx = new AC()
+    // Decode with an OfflineAudioContext: it doesn't count against the live
+    // AudioContext limit and isn't affected by autoplay suspension, so it's
+    // far more reliable than spinning up a real AudioContext per synthesis.
+    const OAC = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext
+    const ctx: BaseAudioContext = new OAC(2, 1, 44100)
     const chunks = chunkText(text)
     if (!chunks.length) return null
     const buffers: AudioBuffer[] = []
@@ -331,10 +333,9 @@ export async function synthesizeVoice(
     const merged = buffers.length === 1 ? buffers[0] : concatBuffers(ctx, buffers, CHUNK_GAP)
     voiceBufferCache.set(key, merged)
     return merged
-  } catch {
+  } catch (e) {
+    console.warn('[synthesizeVoice] SpeakKit unavailable, using browser voice:', e)
     return null
-  } finally {
-    if (ctx && ctx.state !== 'closed') ctx.close().catch(() => {})
   }
 }
 
@@ -457,13 +458,15 @@ export class MantraSession {
   }
 
   pause() {
-    if (this.mode === 'buffer') this.ctx?.suspend()
-    else speechSynthesis.pause()
+    // Suspend the context so the MUSIC pauses in both modes; in speech mode
+    // also pause the browser utterance (it isn't routed through the context).
+    this.ctx?.suspend()
+    if (this.mode === 'speech') speechSynthesis.pause()
   }
 
   resume() {
-    if (this.mode === 'buffer') this.ctx?.resume()
-    else speechSynthesis.resume()
+    this.ctx?.resume()
+    if (this.mode === 'speech') speechSynthesis.resume()
   }
 
   stop() {
