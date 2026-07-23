@@ -52,9 +52,9 @@ if (mb_strlen($text) > 4500) {
 $gender = (($body['gender'] ?? 'female') === 'male') ? 'male' : 'female';
 $voice = $gender === 'male' ? 'filipp' : 'alena';
 
-// Дефолт множителя темпа. 0.8 ≈ 94 слов/мин для alena/filipp
-// (на speed=1.0 замерено ≈117.5 сл/мин; 0.72 ≈ 85 сл/мин).
-$speed = isset($body['speed']) ? (float) $body['speed'] : 0.8;
+// Дефолт множителя темпа. 0.72 ≈ 85 слов/мин для alena/filipp
+// (на speed=1.0 замерено ≈117.5 сл/мин).
+$speed = isset($body['speed']) ? (float) $body['speed'] : 0.72;
 $speed = max(0.1, min(3.0, $speed));
 
 $post = http_build_query([
