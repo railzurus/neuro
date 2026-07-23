@@ -73,7 +73,7 @@ $systemPrompt = <<<'PROMPT'
 PROMPT;
 
 $payload = json_encode([
-    'modelUri' => "gpt://{$folderId}/yandexgpt/latest",
+    'modelUri' => "gpt://{$folderId}/yandexgpt-lite/latest",
     'completionOptions' => [
         'stream' => false,
         'temperature' => 0.3,
