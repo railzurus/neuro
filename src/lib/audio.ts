@@ -1,20 +1,33 @@
 /**
  * Audio engine for the dream-life mantra.
  *
- *  - Alpha-wave bed: real binaural beat (~10 Hz) generated live with the Web
- *    Audio API — two sine carriers panned hard left/right plus a soft, slowly
- *    breathing pad. No external files or API keys required.
+ *  - Music bed: a ready-made, licensed alpha/theta ambient track
+ *    (`/music/alpha-tide.mp3`) is loaded, decoded, looped and played quietly
+ *    under the voice. If it fails to load, we fall back to a live binaural
+ *    beat (~10 Hz) generated with the Web Audio API — so there is always a bed.
  *  - Voice: the browser SpeechSynthesis API reads the user's own text at a slow,
  *    even pace (~85 words/min), split into sentences for reliable long-text
  *    playback and progress reporting.
+ *  - Mixing: live playback mixes voice + music through the Web Audio graph;
+ *    downloads are rendered offline (music looped to length, voice overlaid if
+ *    an audio buffer is provided) — no server or ffmpeg required.
  *
- * PROVIDER HOOK: to ship studio-quality voiced downloads, swap `speakSentence`
- * and the download path for a backend TTS call (Yandex SpeakKit / OpenAI /
- * ElevenLabs) that returns an audio buffer, then mix it with the bed offline.
+ * PROVIDER HOOK: once a TTS backend (Yandex SpeakKit) returns the voice as an
+ * audio file, decode it to an AudioBuffer and pass it to `renderMix` — the
+ * download then contains voice + music baked into one file.
  */
 
-const CARRIER = 196 // base carrier (G3) — warm, unobtrusive
-const BEAT = 10 // Hz difference => alpha range (8–12 Hz)
+const MUSIC_URL = '/music/alpha-tide.mp3'
+/** Music level under the voice (0..1). Kept low so it never presses. */
+const MUSIC_UNDER_VOICE = 0.2
+/** Music level for a standalone (voice-less) download. */
+const MUSIC_SOLO = 0.55
+/** Seconds the bed plays alone before the voice enters. */
+const VOICE_OFFSET = 1.8
+
+// Binaural fallback settings (used only if the music file fails to load).
+const CARRIER = 196
+const BEAT = 10
 const BED_GAIN = 0.14
 
 export interface BedNodes {
@@ -22,7 +35,71 @@ export interface BedNodes {
   setVolume: (v: number) => void
 }
 
-/** Build and start the alpha-wave bed on a live AudioContext. */
+/* ------------------------------------------------------------------ */
+/*  Music track loading (cached raw bytes, decoded per context)        */
+/* ------------------------------------------------------------------ */
+
+let rawMusic: ArrayBuffer | null = null
+
+async function fetchMusicBytes(): Promise<ArrayBuffer> {
+  if (!rawMusic) {
+    const res = await fetch(MUSIC_URL)
+    if (!res.ok) throw new Error(`music fetch failed: ${res.status}`)
+    rawMusic = await res.arrayBuffer()
+  }
+  // decodeAudioData detaches the buffer, so hand out a copy each time.
+  return rawMusic.slice(0)
+}
+
+/** Warm the cache early (e.g. on page load) so playback starts instantly. */
+export function preloadMusic(): void {
+  fetchMusicBytes().catch(() => {})
+}
+
+function decodeMusic(ctx: BaseAudioContext): Promise<AudioBuffer> {
+  return fetchMusicBytes().then((bytes) => ctx.decodeAudioData(bytes))
+}
+
+/** Start the looped music track as the live bed. */
+function startMusicBed(
+  ctx: AudioContext,
+  buffer: AudioBuffer,
+  gain = MUSIC_UNDER_VOICE,
+): BedNodes {
+  const now = ctx.currentTime
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  src.loop = true
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0.0001, now)
+  g.gain.exponentialRampToValueAtTime(gain, now + 4)
+  src.connect(g).connect(ctx.destination)
+  src.start(now)
+
+  return {
+    stop(fadeSec = 2) {
+      const t = ctx.currentTime
+      g.gain.cancelScheduledValues(t)
+      g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), t)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + fadeSec)
+      try {
+        src.stop(t + fadeSec + 0.05)
+      } catch {
+        /* already stopped */
+      }
+    },
+    setVolume(v) {
+      const t = ctx.currentTime
+      g.gain.cancelScheduledValues(t)
+      g.gain.linearRampToValueAtTime(Math.max(v, 0.0001), t + 0.3)
+    },
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Binaural fallback bed (only if the music file cannot load)         */
+/* ------------------------------------------------------------------ */
+
 export function startBed(ctx: AudioContext): BedNodes {
   const now = ctx.currentTime
   const master = ctx.createGain()
@@ -30,7 +107,6 @@ export function startBed(ctx: AudioContext): BedNodes {
   master.gain.exponentialRampToValueAtTime(BED_GAIN, now + 4)
   master.connect(ctx.destination)
 
-  // --- Binaural carriers, one per ear ---
   const merger = ctx.createChannelMerger(2)
   const left = ctx.createOscillator()
   const right = ctx.createOscillator()
@@ -46,7 +122,6 @@ export function startBed(ctx: AudioContext): BedNodes {
   right.connect(rg).connect(merger, 0, 1)
   merger.connect(master)
 
-  // --- Soft breathing pad for musicality ---
   const pad = ctx.createGain()
   pad.gain.value = 0.5
   const padFilter = ctx.createBiquadFilter()
@@ -57,15 +132,14 @@ export function startBed(ctx: AudioContext): BedNodes {
   padA.type = 'triangle'
   padB.type = 'triangle'
   padA.frequency.value = CARRIER / 2
-  padB.frequency.value = CARRIER / 2 + 0.3 // gentle detune => slow chorus
+  padB.frequency.value = CARRIER / 2 + 0.3
   padA.connect(pad)
   padB.connect(pad)
   pad.connect(padFilter).connect(master)
 
-  // Slow amplitude "breath" LFO on the pad.
   const lfo = ctx.createOscillator()
   const lfoGain = ctx.createGain()
-  lfo.frequency.value = 0.1 // ~10 s cycle
+  lfo.frequency.value = 0.1
   lfoGain.gain.value = 0.25
   lfo.connect(lfoGain).connect(pad.gain)
 
@@ -114,7 +188,6 @@ export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
       speechSynthesis.removeEventListener('voiceschanged', handler)
     }
     speechSynthesis.addEventListener('voiceschanged', handler)
-    // Safety timeout in case the event never fires.
     setTimeout(() => resolve(speechSynthesis.getVoices()), 1500)
   })
 }
@@ -129,12 +202,11 @@ export function pickVoice(gender: 'female' | 'male'): SpeechSynthesisVoice | und
   const hints = gender === 'female' ? FEMALE_HINTS : MALE_HINTS
   const byHint = pool.find((v) => hints.some((h) => v.name.toLowerCase().includes(h)))
   if (byHint) return byHint
-  // Fall back: first Russian voice, else first available.
   return pool[0]
 }
 
 /* ------------------------------------------------------------------ */
-/*  Mantra session (bed + narration together)                          */
+/*  Mantra session (music bed + narration together)                    */
 /* ------------------------------------------------------------------ */
 
 export interface SessionCallbacks {
@@ -174,10 +246,25 @@ export class MantraSession {
 
     const AC = window.AudioContext || (window as any).webkitAudioContext
     this.ctx = new AC()
-    this.bed = startBed(this.ctx)
 
-    // Give the bed a breath before the voice enters.
-    setTimeout(() => this.speakNext(gender), 1800)
+    // Establish the bed (real track, or binaural fallback), then let the
+    // music breathe for a moment before the voice enters.
+    this.initBed().then(() => {
+      if (this.stopped) return
+      setTimeout(() => this.speakNext(gender), VOICE_OFFSET * 1000)
+    })
+  }
+
+  private async initBed() {
+    if (!this.ctx) return
+    try {
+      const buffer = await decodeMusic(this.ctx)
+      if (this.stopped || !this.ctx) return
+      this.bed = startMusicBed(this.ctx, buffer)
+    } catch {
+      if (this.stopped || !this.ctx) return
+      this.bed = startBed(this.ctx) // binaural fallback
+    }
   }
 
   private speakNext(gender: 'female' | 'male') {
@@ -202,7 +289,6 @@ export class MantraSession {
       if (this.stopped) return
       this.idx += 1
       this.cb.onProgress?.(this.idx / this.sentences.length)
-      // A soft pause between phrases keeps the delivery calm.
       setTimeout(() => this.speakNext(gender), 900)
     }
     u.onerror = () => {
@@ -217,7 +303,6 @@ export class MantraSession {
     this.cb.onProgress?.(1)
     this.bed?.stop(3)
     this.cb.onEnd?.()
-    // Let the fade finish, then release the context.
     setTimeout(() => this.closeCtx(), 3500)
   }
 
@@ -250,23 +335,70 @@ export class MantraSession {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Offline render — downloadable alpha-wave bed (WAV)                  */
+/*  Offline render — downloadable mix (music, + voice when available)  */
 /* ------------------------------------------------------------------ */
 
 /**
- * Render the alpha-wave bed to a WAV Blob of the given duration.
- * Used for the "Скачать" action. (A full voiced mix is produced server-side
- * once a TTS provider is connected — see the module header.)
+ * Render a downloadable WAV of the given duration.
+ *  - The licensed music track is looped to fill the duration with gentle
+ *    fade-in / fade-out.
+ *  - If `voiceBuffer` is provided (from a TTS backend), it is overlaid on top
+ *    and the music sits quietly beneath it; otherwise the music plays at a
+ *    fuller standalone level.
+ *
+ * Falls back to a rendered binaural bed if the music track can't be decoded.
  */
-export async function renderBedWav(durationSec: number): Promise<Blob> {
+export async function renderMix(
+  durationSec: number,
+  voiceBuffer: AudioBuffer | null = null,
+): Promise<Blob> {
   const sampleRate = 44100
   const OAC = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext
   const ctx: OfflineAudioContext = new OAC(2, Math.ceil(sampleRate * durationSec), sampleRate)
 
+  const musicLevel = voiceBuffer ? MUSIC_UNDER_VOICE : MUSIC_SOLO
+
+  let musicOk = true
+  try {
+    const music = await decodeMusic(ctx)
+    const src = ctx.createBufferSource()
+    src.buffer = music
+    src.loop = true
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, 0)
+    g.gain.exponentialRampToValueAtTime(musicLevel, 4)
+    g.gain.setValueAtTime(musicLevel, Math.max(durationSec - 4, 4))
+    g.gain.exponentialRampToValueAtTime(0.0001, durationSec)
+    src.connect(g).connect(ctx.destination)
+    src.start(0)
+    src.stop(durationSec)
+  } catch {
+    musicOk = false
+  }
+
+  if (!musicOk) {
+    renderBinauralInto(ctx, durationSec)
+  }
+
+  if (voiceBuffer) {
+    const v = ctx.createBufferSource()
+    v.buffer = voiceBuffer
+    const vg = ctx.createGain()
+    vg.gain.value = 1
+    v.connect(vg).connect(ctx.destination)
+    v.start(Math.min(VOICE_OFFSET, durationSec))
+  }
+
+  const buffer = await ctx.startRendering()
+  return encodeWav(buffer)
+}
+
+/** Build the binaural bed inside an offline context (fallback for renderMix). */
+function renderBinauralInto(ctx: OfflineAudioContext, durationSec: number) {
   const master = ctx.createGain()
   master.gain.setValueAtTime(0.0001, 0)
   master.gain.exponentialRampToValueAtTime(BED_GAIN, 4)
-  master.gain.setValueAtTime(BED_GAIN, durationSec - 4)
+  master.gain.setValueAtTime(BED_GAIN, Math.max(durationSec - 4, 4))
   master.gain.exponentialRampToValueAtTime(0.0001, durationSec)
   master.connect(ctx.destination)
 
@@ -285,32 +417,10 @@ export async function renderBedWav(durationSec: number): Promise<Blob> {
   right.connect(rg).connect(merger, 0, 1)
   merger.connect(master)
 
-  const pad = ctx.createGain()
-  pad.gain.value = 0.5
-  const padFilter = ctx.createBiquadFilter()
-  padFilter.type = 'lowpass'
-  padFilter.frequency.value = 520
-  const padA = ctx.createOscillator()
-  const padB = ctx.createOscillator()
-  padA.type = 'triangle'
-  padB.type = 'triangle'
-  padA.frequency.value = CARRIER / 2
-  padB.frequency.value = CARRIER / 2 + 0.3
-  padA.connect(pad)
-  padB.connect(pad)
-  pad.connect(padFilter).connect(master)
-
-  const lfo = ctx.createOscillator()
-  const lfoGain = ctx.createGain()
-  lfo.frequency.value = 0.1
-  lfoGain.gain.value = 0.25
-  lfo.connect(lfoGain).connect(pad.gain)
-
-  ;[left, right, padA, padB, lfo].forEach((o) => o.start(0))
-  ;[left, right, padA, padB, lfo].forEach((o) => o.stop(durationSec))
-
-  const buffer = await ctx.startRendering()
-  return encodeWav(buffer)
+  ;[left, right].forEach((o) => {
+    o.start(0)
+    o.stop(durationSec)
+  })
 }
 
 function encodeWav(buffer: AudioBuffer): Blob {

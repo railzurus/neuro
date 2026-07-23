@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Download, Loader2, Pause, Play, RotateCcw, Headphones } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { wordCount } from '../lib/refine'
-import { MantraSession, loadVoices, renderBedWav } from '../lib/audio'
+import { MantraSession, loadVoices, preloadMusic, renderMix } from '../lib/audio'
 
 const WPM = 85
 
@@ -26,6 +26,7 @@ export default function Listen() {
   useEffect(() => {
     setTtsSupported('speechSynthesis' in window)
     loadVoices()
+    preloadMusic()
     return () => sessionRef.current?.stop()
   }, [])
 
@@ -61,7 +62,7 @@ export default function Listen() {
     if (rendering) return
     setRendering(true)
     try {
-      const blob = await renderBedWav(bedSeconds)
+      const blob = await renderMix(bedSeconds)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
