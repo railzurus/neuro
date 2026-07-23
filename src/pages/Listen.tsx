@@ -189,9 +189,7 @@ export default function Listen() {
       <div className="mt-12 rounded-3xl glass p-8">
         <h2 className="font-serif text-2xl text-ink-900">Забрать с собой</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-ink-500 leading-relaxed">
-          Скачайте запись, чтобы слушать её каждый вечер в течение 30 дней. Если
-          подключён голос (SpeechKit) — в файле будут голос и музыка вместе; если
-          нет — только дорожка альфа-волн.
+          Скачайте запись, чтобы слушать её каждый вечер в течение 30 дней.
         </p>
         <button onClick={download} disabled={rendering} className="btn-primary mt-5">
           {rendering ? (
