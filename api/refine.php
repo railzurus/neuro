@@ -34,7 +34,10 @@ if (!is_file($configFile)) {
 }
 $config = require $configFile;
 $trimChars = " \t\n\r\0\x0B\"'";
-$apiKey = trim((string) ($config['gpt_api_key'] ?? $config['speechkit_api_key'] ?? ''), $trimChars);
+// Берём gpt_api_key, а если он пуст (пустая строка, не только null) — speechkit_api_key.
+$gptKey = trim((string) ($config['gpt_api_key'] ?? ''), $trimChars);
+$ttsKey = trim((string) ($config['speechkit_api_key'] ?? ''), $trimChars);
+$apiKey = $gptKey !== '' ? $gptKey : $ttsKey;
 $folderId = trim((string) ($config['folder_id'] ?? ''), $trimChars);
 if ($apiKey === '' || $folderId === '' || strpos($apiKey, 'ВАШ') === 0) {
     rfail(503, 'GPT not configured');
