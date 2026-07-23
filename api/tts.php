@@ -27,8 +27,9 @@ if (!is_file($configFile)) {
     fail(503, 'TTS not configured'); // secrets.php ещё не загружен на сервер
 }
 $config = require $configFile;
-$apiKey = $config['speechkit_api_key'] ?? '';
-$folderId = $config['folder_id'] ?? '';
+// Обрезаем случайные пробелы/переводы строк/кавычки вокруг значений.
+$apiKey = trim((string) ($config['speechkit_api_key'] ?? ''), " \t\n\r\0\x0B\"'");
+$folderId = trim((string) ($config['folder_id'] ?? ''), " \t\n\r\0\x0B\"'");
 if ($apiKey === '' || $folderId === '' || strpos($apiKey, 'ВАШ') === 0) {
     fail(503, 'TTS not configured');
 }
