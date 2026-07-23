@@ -47,6 +47,24 @@ $body = json_decode(file_get_contents('php://input'), true);
 if (!is_array($body)) {
     rfail(400, 'Invalid JSON body');
 }
+
+// Безопасная диагностика (без раскрытия ключей): { "debug": true }
+if (!empty($body['debug'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'gpt_key_set' => $gptKey !== '',
+        'gpt_key_len' => strlen($gptKey),
+        'gpt_key_prefix' => substr($gptKey, 0, 4),
+        'tts_key_set' => $ttsKey !== '',
+        'tts_key_len' => strlen($ttsKey),
+        'tts_key_prefix' => substr($ttsKey, 0, 4),
+        'using' => $gptKey !== '' ? 'gpt_api_key' : 'speechkit_api_key',
+        'used_key_prefix' => substr($apiKey, 0, 4),
+        'keys_equal' => $gptKey !== '' && $gptKey === $ttsKey,
+        'folder_id' => $folderId,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $text = isset($body['text']) ? trim((string) $body['text']) : '';
 if ($text === '') {
     rfail(400, 'Empty text');
