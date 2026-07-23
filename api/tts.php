@@ -40,6 +40,22 @@ if (!is_array($body)) {
     fail(400, 'Invalid JSON body');
 }
 
+// Временная безопасная диагностика ключей: { "debug": true }
+if (!empty($body['debug'])) {
+    $g = trim((string) ($config['gpt_api_key'] ?? ''), " \t\n\r\0\x0B\"'");
+    $mask = function (string $k) {
+        return $k === '' ? '' : substr($k, 0, 4) . '…' . substr($k, -4) . ' (len ' . strlen($k) . ')';
+    };
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'speechkit_api_key' => $mask($apiKey),
+        'gpt_api_key' => $mask($g),
+        'same_key' => $g !== '' && $g === $apiKey,
+        'folder_id' => $folderId,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $text = isset($body['text']) ? trim((string) $body['text']) : '';
 if ($text === '') {
     fail(400, 'Empty text');
