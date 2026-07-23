@@ -18,8 +18,13 @@
  */
 
 const MUSIC_URL = '/music/alpha-tide.mp3'
-/** Music level under the voice (0..1). Kept low so it never presses. */
-const MUSIC_UNDER_VOICE = 0.2
+/**
+ * Music level under the voice (0..1). With the browser SpeechSynthesis voice
+ * (which plays at full OS volume in a separate channel) the bed has to sit
+ * higher to be audible at all. Will be re-balanced lower once the voice comes
+ * from SpeakKit inside the same Web Audio graph.
+ */
+const MUSIC_UNDER_VOICE = 0.42
 /** Music level for a standalone (voice-less) download. */
 const MUSIC_SOLO = 0.55
 /** Seconds the bed plays alone before the voice enters. */
@@ -72,7 +77,7 @@ function startMusicBed(
   src.loop = true
   const g = ctx.createGain()
   g.gain.setValueAtTime(0.0001, now)
-  g.gain.exponentialRampToValueAtTime(gain, now + 4)
+  g.gain.exponentialRampToValueAtTime(gain, now + 2)
   src.connect(g).connect(ctx.destination)
   src.start(now)
 
