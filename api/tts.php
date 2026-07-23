@@ -56,6 +56,42 @@ if (!empty($body['debug'])) {
     exit;
 }
 
+// Временная диагностика v3: { "debugV3": true } — пробный вызов v3 через
+// foundationModels-ключ, возвращает сырой ответ, чтобы увидеть формат.
+if (!empty($body['debugV3'])) {
+    $g = trim((string) ($config['gpt_api_key'] ?? ''), " \t\n\r\0\x0B\"'");
+    $key = $g !== '' ? $g : $apiKey;
+    $payloadV3 = json_encode([
+        'text' => 'Проверка синтеза речи.',
+        'outputAudioSpec' => ['containerAudio' => ['containerAudioType' => 'MP3']],
+        'hints' => [['voice' => 'alena'], ['speed' => 0.72]],
+        'loudnessNormalizationType' => 'LUFS',
+    ], JSON_UNESCAPED_UNICODE);
+    $c = curl_init('https://tts.api.cloud.yandex.net/tts/v3/utteranceSynthesis');
+    curl_setopt_array($c, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payloadV3,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Api-Key ' . $key,
+            'Content-Type: application/json',
+            'x-folder-id: ' . $folderId,
+        ],
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    $r = curl_exec($c);
+    $st = (int) curl_getinfo($c, CURLINFO_HTTP_CODE);
+    curl_close($c);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'v3_status' => $st,
+        'v3_len' => strlen((string) $r),
+        'v3_head' => substr((string) $r, 0, 400),
+        'key_used' => substr($key, 0, 4) . '…' . substr($key, -4),
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $text = isset($body['text']) ? trim((string) $body['text']) : '';
 if ($text === '') {
     fail(400, 'Empty text');
