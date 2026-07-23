@@ -7,6 +7,7 @@ import {
   MantraSession,
   loadVoices,
   preloadMusic,
+  previewText,
   renderMix,
   synthesizeVoice,
 } from '../lib/audio'
@@ -41,7 +42,9 @@ export default function Listen() {
     sessionRef.current = session
     setProgress(0)
     setState('preparing')
-    session.start(finalText, voice, {
+    // На сайте озвучиваем только короткое превью (~30 с); полный текст —
+    // при скачивании. Это быстрее и экономит синтез.
+    session.start(previewText(finalText), voice, {
       onReady: () => setState('playing'),
       onProgress: (f) => setProgress(f),
       onEnd: () => setState('done'),
@@ -115,8 +118,8 @@ export default function Listen() {
       <h1 className="font-serif text-4xl text-ink-900">Ваша мантра готова</h1>
       <p className="mx-auto mt-2 max-w-md text-ink-600 leading-relaxed">
         {voice === 'female' ? 'Женский' : 'Мужской'} голос читает вашу историю в
-        медленном темпе на фоне альфа-волн. Устройтесь удобно, наденьте наушники
-        и закройте глаза.
+        медленном темпе на фоне альфа-волн. Здесь звучит короткое превью
+        (~30 секунд) — полная запись доступна при скачивании.
       </p>
 
       {/* Breathing orb */}

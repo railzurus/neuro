@@ -248,6 +248,23 @@ const CHUNK_GAP = 0.35
 
 const voiceBufferCache = new Map<string, AudioBuffer>()
 
+/**
+ * First whole sentences up to ~targetWords — a short on-site preview
+ * (~30 s at ≈90 words/min). The full text is used only for the download.
+ */
+export function previewText(full: string, targetWords = 45): string {
+  const sentences = splitSentences(full)
+  if (!sentences.length) return full.trim()
+  const out: string[] = []
+  let words = 0
+  for (const s of sentences) {
+    out.push(s)
+    words += s.split(/\s+/).filter(Boolean).length
+    if (words >= targetWords) break
+  }
+  return out.join(' ')
+}
+
 /** Split text into request-sized chunks on sentence boundaries. */
 function chunkText(text: string, limit = CHUNK_LIMIT): string[] {
   const sentences = splitSentences(text)
