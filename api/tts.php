@@ -54,6 +54,14 @@ if (mb_strlen($text) > 4900) {
 
 $gender = (($body['gender'] ?? 'female') === 'male') ? 'male' : 'female';
 $voice = $gender === 'male' ? 'filipp' : 'alena';
+// Явный выбор голоса (для страницы выбора / примеров).
+$ALLOWED_VOICES = [
+    'alena', 'filipp', 'jane', 'omazh', 'oksana', 'zahar', 'ermil', 'madirus',
+    'dasha', 'julia', 'lera', 'marina', 'masha', 'alexander', 'kirill', 'anton',
+];
+if (!empty($body['voice']) && in_array($body['voice'], $ALLOWED_VOICES, true)) {
+    $voice = (string) $body['voice'];
+}
 
 // Множитель темпа. 0.8 ≈ 94 слов/мин для alena/filipp.
 $speed = isset($body['speed']) ? (float) $body['speed'] : 0.8;
