@@ -52,9 +52,9 @@ if (mb_strlen($text) > 4500) {
 $gender = (($body['gender'] ?? 'female') === 'male') ? 'male' : 'female';
 $voice = $gender === 'male' ? 'filipp' : 'alena';
 
-// Дефолт 0.72 даёт ~85 слов/мин для голосов alena/filipp (замерено эмпирически:
-// на speed=1.0 ≈117.5 сл/мин, 0.72×117.5 ≈ 85).
-$speed = isset($body['speed']) ? (float) $body['speed'] : 0.72;
+// Дефолт множителя темпа. 0.8 ≈ 94 слов/мин для alena/filipp
+// (на speed=1.0 замерено ≈117.5 сл/мин; 0.72 ≈ 85 сл/мин).
+$speed = isset($body['speed']) ? (float) $body['speed'] : 0.8;
 $speed = max(0.1, min(3.0, $speed));
 
 $post = http_build_query([
