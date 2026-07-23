@@ -77,8 +77,8 @@ export default function Listen() {
       const a = document.createElement('a')
       a.href = url
       a.download = voiceBuffer
-        ? 'жизнь-мечты-голос-и-музыка.wav'
-        : 'альфа-волны-жизнь-мечты.wav'
+        ? 'жизнь-мечты-голос-и-музыка.mp3'
+        : 'альфа-волны-жизнь-мечты.mp3'
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -199,7 +199,7 @@ export default function Listen() {
           ) : (
             <Download className="h-4 w-4" />
           )}
-          {rendering ? 'Готовим файл…' : 'Скачать запись (WAV)'}
+          {rendering ? 'Готовим файл…' : 'Скачать запись (MP3)'}
         </button>
       </div>
     </div>

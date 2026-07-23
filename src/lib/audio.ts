@@ -1,3 +1,5 @@
+import { Mp3Encoder } from '@breezystack/lamejs'
+
 /**
  * Audio engine for the dream-life mantra.
  *
@@ -563,7 +565,7 @@ export async function renderMix(
   }
 
   const buffer = await ctx.startRendering()
-  return encodeWav(buffer)
+  return encodeMp3(buffer)
 }
 
 /** Build the binaural bed inside an offline context (fallback for renderMix). */
@@ -596,50 +598,39 @@ function renderBinauralInto(ctx: OfflineAudioContext, durationSec: number) {
   })
 }
 
-function encodeWav(buffer: AudioBuffer): Blob {
-  const numCh = buffer.numberOfChannels
-  const len = buffer.length * numCh * 2 + 44
-  const ab = new ArrayBuffer(len)
-  const view = new DataView(ab)
-  const channels: Float32Array[] = []
-  let offset = 0
-
-  const writeStr = (s: string) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(offset++, s.charCodeAt(i))
+function floatTo16(input: Float32Array): Int16Array {
+  const out = new Int16Array(input.length)
+  for (let i = 0; i < input.length; i++) {
+    const s = Math.max(-1, Math.min(1, input[i]))
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff
   }
+  return out
+}
 
-  writeStr('RIFF')
-  view.setUint32(offset, len - 8, true)
-  offset += 4
-  writeStr('WAVE')
-  writeStr('fmt ')
-  view.setUint32(offset, 16, true)
-  offset += 4
-  view.setUint16(offset, 1, true)
-  offset += 2
-  view.setUint16(offset, numCh, true)
-  offset += 2
-  view.setUint32(offset, buffer.sampleRate, true)
-  offset += 4
-  view.setUint32(offset, buffer.sampleRate * numCh * 2, true)
-  offset += 4
-  view.setUint16(offset, numCh * 2, true)
-  offset += 2
-  view.setUint16(offset, 16, true)
-  offset += 2
-  writeStr('data')
-  view.setUint32(offset, len - offset - 4, true)
-  offset += 4
+/**
+ * Encode a rendered AudioBuffer to an MP3 Blob (lamejs). Runs in ~1152-sample
+ * blocks and yields to the event loop periodically so the UI stays responsive
+ * during a multi-minute render.
+ */
+async function encodeMp3(buffer: AudioBuffer, kbps = 128): Promise<Blob> {
+  const channels = Math.min(buffer.numberOfChannels, 2)
+  const encoder = new Mp3Encoder(channels, buffer.sampleRate, kbps)
+  const left = floatTo16(buffer.getChannelData(0))
+  const right = channels > 1 ? floatTo16(buffer.getChannelData(1)) : null
 
-  for (let ch = 0; ch < numCh; ch++) channels.push(buffer.getChannelData(ch))
-  for (let i = 0; i < buffer.length; i++) {
-    for (let ch = 0; ch < numCh; ch++) {
-      let sample = Math.max(-1, Math.min(1, channels[ch][i]))
-      sample = sample < 0 ? sample * 0x8000 : sample * 0x7fff
-      view.setInt16(offset, sample, true)
-      offset += 2
-    }
+  const blockSize = 1152
+  const chunks: Uint8Array[] = []
+  let processed = 0
+  for (let i = 0; i < left.length; i += blockSize) {
+    const l = left.subarray(i, i + blockSize)
+    const enc = right
+      ? encoder.encodeBuffer(l, right.subarray(i, i + blockSize))
+      : encoder.encodeBuffer(l)
+    if (enc.length > 0) chunks.push(enc)
+    if (++processed % 100 === 0) await new Promise((r) => setTimeout(r))
   }
+  const tail = encoder.flush()
+  if (tail.length > 0) chunks.push(tail)
 
-  return new Blob([ab], { type: 'audio/wav' })
+  return new Blob(chunks as BlobPart[], { type: 'audio/mpeg' })
 }
