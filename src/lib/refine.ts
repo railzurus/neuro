@@ -22,8 +22,24 @@
  *  - задействованы аудиальная / кинестетическая / визуальная системы.
  */
 export async function refineText(text: string): Promise<string> {
-  // Simulate async work so the UI can show a gentle "правим…" state.
-  await new Promise((r) => setTimeout(r, 650))
+  if (!text.trim()) return text
+  // Real editing via YandexGPT (server proxy). Falls back to local
+  // normalisation if the endpoint isn't configured or errors.
+  try {
+    const res = await fetch('/api/refine.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data && typeof data.text === 'string' && data.text.trim()) {
+        return data.text.trim()
+      }
+    }
+  } catch {
+    /* fall through to local normalisation */
+  }
   return normalize(text)
 }
 
