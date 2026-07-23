@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Loader2, Wand2 } from 'lucide-react'
-import { useStore } from '../store/useStore'
+import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Wand2 } from 'lucide-react'
+import { useStore, compile } from '../store/useStore'
 import { refineText, wordCount } from '../lib/refine'
 
 const WPM = 85
@@ -10,23 +10,26 @@ export default function Review() {
   const navigate = useNavigate()
   const answers = useStore((s) => s.answers)
   const finalText = useStore((s) => s.finalText)
-  const finalTouched = useStore((s) => s.finalTouched)
+  const finalSnapshot = useStore((s) => s.finalSnapshot)
   const setFinalText = useStore((s) => s.setFinalText)
-  const compileStory = useStore((s) => s.compileStory)
+  const syncFinalFromAnswers = useStore((s) => s.syncFinalFromAnswers)
   const voice = useStore((s) => s.voice)
   const setVoice = useStore((s) => s.setVoice)
 
   const [refining, setRefining] = useState(false)
 
-  const hasAnswers = Object.values(answers).some((a) => (a || '').trim())
+  const compiled = compile(answers)
+  const hasAnswers = compiled.trim() !== ''
+  // The user hand-edited the story and answers no longer match it.
+  const diverged = finalText.trim() !== '' && finalText !== compiled
 
-  // Initialise the editable story from the compiled answers once.
+  // Keep the story in sync with the answers unless the user edited it by hand.
   useEffect(() => {
-    if (!finalTouched && hasAnswers) {
-      setFinalText(compileStory())
+    if (!finalText.trim() || finalText === finalSnapshot) {
+      syncFinalFromAnswers()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [compiled])
 
   const words = useMemo(() => wordCount(finalText), [finalText])
   const seconds = Math.round((words / WPM) * 60)
@@ -72,13 +75,30 @@ export default function Review() {
         <span className="chip">темп {WPM} слов/мин</span>
       </div>
 
+      {diverged && (
+        <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-brand/30 bg-brand/[0.06] p-4 text-sm text-ink-700 sm:flex-row sm:items-center sm:justify-between">
+          <span>Ответы изменились и не совпадают с этим текстом.</span>
+          <button
+            onClick={syncFinalFromAnswers}
+            className="inline-flex items-center gap-2 self-start rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-white sm:self-auto"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Собрать заново из ответов
+          </button>
+        </div>
+      )}
+
       <textarea
         value={finalText}
         onChange={(e) => setFinalText(e.target.value)}
         rows={16}
         className="mt-4 w-full resize-none rounded-2xl border border-black/[0.07] bg-white p-5 font-serif text-lg leading-relaxed text-ink-900 shadow-soft focus:border-brand/60"
       />
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+        <button onClick={syncFinalFromAnswers} className="btn-outline">
+          <RefreshCw className="h-4 w-4" />
+          Собрать из ответов
+        </button>
         <button
           onClick={handleRefine}
           disabled={!finalText.trim() || refining}
