@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight, Moon, Sparkles } from 'lucide-react'
 import { MANIFESTO, RITUAL, ROLES } from '../data/roles'
 import { RoleIconTile } from '../components/RoleIcon'
 
@@ -9,10 +9,9 @@ export default function Intro() {
       {/* Hero */}
       <section className="relative pt-10 pb-16 text-center">
         <div className="pointer-events-none absolute left-1/2 top-6 -z-10 h-56 w-56 -translate-x-1/2 rounded-full bg-blob-clay/70 blur-3xl animate-breathe" />
-        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/70 px-4 py-1.5 text-xs text-ink-600 shadow-soft">
-          <Sparkles className="h-3.5 w-3.5 text-gold" />
-          Метод Лизы Головиной
-        </div>
+        <span className="mb-5 inline-grid h-14 w-14 place-items-center rounded-full bg-white shadow-soft border border-black/5">
+          <Moon className="h-7 w-7 text-brand" />
+        </span>
         <h1 className="font-serif text-5xl sm:text-6xl leading-[1.05] text-ink-900 animate-fadeup">
           Прояви жизнь
           <br />
@@ -20,6 +19,10 @@ export default function Intro() {
             своей мечты
           </span>
         </h1>
+        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/70 px-4 py-1.5 text-xs text-ink-600 shadow-soft">
+          <Sparkles className="h-3.5 w-3.5 text-gold" />
+          Метод Лизы Головиной
+        </div>
         <p className="mx-auto mt-6 max-w-xl text-ink-600 leading-relaxed">
           Создано на основе 26 лет медитаций, методов Хосе Сильвы, Ошо, Колина
           Типпинга, НЛП и когнитивно-поведенческой терапии.

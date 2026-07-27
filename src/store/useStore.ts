@@ -1,8 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { ROLES } from '../data/roles'
-
-export type VoiceGender = 'female' | 'male'
+import { DEFAULT_VOICE } from '../data/voices'
 
 interface State {
   /** roleId -> user's answer text */
@@ -16,13 +15,14 @@ interface State {
    * clobbering manual edits.
    */
   finalSnapshot: string
-  voice: VoiceGender
+  /** Selected SpeechKit voice id (see data/voices.ts). */
+  voice: string
   setAnswer: (roleId: string, text: string) => void
   /** Manual edit of the final story — does NOT move the snapshot. */
   setFinalText: (text: string) => void
   /** Force finalText to the current compiled answers (and move the snapshot). */
   syncFinalFromAnswers: () => void
-  setVoice: (v: VoiceGender) => void
+  setVoice: (v: string) => void
   compileStory: () => string
   reset: () => void
 }
@@ -39,7 +39,7 @@ export const useStore = create<State>()(
       answers: {},
       finalText: '',
       finalSnapshot: '',
-      voice: 'female',
+      voice: DEFAULT_VOICE,
       setAnswer: (roleId, text) =>
         set((s) => ({ answers: { ...s.answers, [roleId]: text } })),
       setFinalText: (text) => set({ finalText: text }),

@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { Moon } from 'lucide-react'
+import { Mail } from 'lucide-react'
 
 export default function App() {
   const location = useLocation()
@@ -9,11 +9,8 @@ export default function App() {
     <div className="aurora-bg min-h-full flex flex-col">
       <header className="w-full">
         <div className="mx-auto max-w-5xl px-6 py-5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 group">
-            <span className="grid place-items-center h-9 w-9 rounded-full bg-white shadow-soft border border-black/5 group-hover:border-brand/40 transition-colors">
-              <Moon className="h-4 w-4 text-brand" />
-            </span>
-            <span className="font-serif text-lg tracking-wide text-ink-900">
+          <Link to="/" className="group">
+            <span className="font-serif text-lg tracking-wide text-ink-900 group-hover:text-brand transition-colors">
               Жизнь мечты
             </span>
           </Link>
@@ -33,15 +30,24 @@ export default function App() {
       </main>
 
       <footer className="w-full">
-        <div className="mx-auto max-w-5xl px-6 py-8 text-center text-xs text-ink-400">
-          Сервис разработан компанией{' '}
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-6 py-8 text-center text-xs text-ink-400">
+          <p>
+            Сервис разработан компанией{' '}
+            <a
+              href="https://zurus.tech/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand hover:underline"
+            >
+              ZURUS.TECH
+            </a>
+          </p>
           <a
-            href="https://zurus.tech/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-brand hover:underline"
+            href="mailto:ceo@zurus.tech?subject=Отзыв о сервисе «Прояви жизнь своей мечты»"
+            className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-4 py-1.5 text-ink-600 shadow-soft transition-colors hover:border-brand/40 hover:text-brand"
           >
-            ZURUS
+            <Mail className="h-3.5 w-3.5" />
+            Отправить отзыв
           </a>
         </div>
       </footer>

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Wand2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Loader2, Pause, Play, RefreshCw, Wand2 } from 'lucide-react'
 import { useStore, compile } from '../store/useStore'
 import { refineText, wordCount } from '../lib/refine'
+import { VOICES, normalizeVoiceId, type VoiceOption } from '../data/voices'
 
 const WPM = 85
 
@@ -17,6 +18,28 @@ export default function Review() {
   const setVoice = useStore((s) => s.setVoice)
 
   const [refining, setRefining] = useState(false)
+  const [previewing, setPreviewing] = useState<string | null>(null)
+  const previewRef = useRef<HTMLAudioElement | null>(null)
+
+  // Migrate any legacy stored voice ('female'/'male') to a valid id.
+  useEffect(() => {
+    const norm = normalizeVoiceId(voice)
+    if (norm !== voice) setVoice(norm)
+    return () => previewRef.current?.pause()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function togglePreview(id: string) {
+    const el = previewRef.current
+    if (!el) return
+    if (previewing === id) {
+      el.pause()
+      setPreviewing(null)
+      return
+    }
+    el.src = `/voices/${id}.mp3`
+    el.play().then(() => setPreviewing(id)).catch(() => setPreviewing(null))
+  }
 
   const compiled = compile(answers)
   const hasAnswers = compiled.trim() !== ''
@@ -111,22 +134,30 @@ export default function Review() {
 
       {/* Voice choice */}
       <h2 className="mt-12 font-serif text-2xl text-ink-900">Выберите голос</h2>
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <VoiceCard
-          active={voice === 'female'}
-          onClick={() => setVoice('female')}
-          icon={<span className="text-xl leading-none">♀</span>}
-          title="Женский"
-          desc="Мягкий, обволакивающий"
-        />
-        <VoiceCard
-          active={voice === 'male'}
-          onClick={() => setVoice('male')}
-          icon={<span className="text-xl leading-none">♂</span>}
-          title="Мужской"
-          desc="Тёплый, спокойный"
-        />
-      </div>
+      <p className="mt-1 text-sm text-ink-500">
+        Нажмите ▶, чтобы послушать пример, и выберите голос для вашей записи.
+      </p>
+      <audio ref={previewRef} onEnded={() => setPreviewing(null)} className="hidden" />
+
+      {(['female', 'male'] as const).map((g) => (
+        <div key={g} className="mt-5">
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
+            {g === 'female' ? 'Женские' : 'Мужские'}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {VOICES.filter((v) => v.gender === g).map((v) => (
+              <VoiceChoice
+                key={v.id}
+                v={v}
+                active={voice === v.id}
+                playing={previewing === v.id}
+                onSelect={() => setVoice(v.id)}
+                onPreview={() => togglePreview(v.id)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
 
       {/* Nav */}
       <div className="mt-12 flex items-center justify-between">
@@ -147,39 +178,54 @@ export default function Review() {
   )
 }
 
-function VoiceCard({
+function VoiceChoice({
+  v,
   active,
-  onClick,
-  icon,
-  title,
-  desc,
+  playing,
+  onSelect,
+  onPreview,
 }: {
+  v: VoiceOption
   active: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  title: string
-  desc: string
+  playing: boolean
+  onSelect: () => void
+  onPreview: () => void
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-4 rounded-2xl border p-5 text-left transition-all ${
+    <div
+      className={`flex items-center gap-3 rounded-2xl border p-4 transition-all ${
         active
           ? 'border-brand/60 bg-brand/[0.06] shadow-soft'
-          : 'border-black/[0.07] bg-white hover:border-brand/30 hover:-translate-y-0.5'
+          : 'border-black/[0.07] bg-white'
       }`}
     >
-      <span
-        className={`grid h-11 w-11 place-items-center rounded-full ${
-          active ? 'bg-brand/15 text-brand' : 'bg-black/[0.04] text-ink-500'
+      <button
+        onClick={onPreview}
+        aria-label={playing ? 'Остановить' : 'Прослушать'}
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors ${
+          playing
+            ? 'bg-brand text-white'
+            : 'bg-black/[0.04] text-ink-600 hover:bg-brand/10 hover:text-brand'
         }`}
       >
-        {icon}
-      </span>
-      <span>
-        <span className="block font-medium text-ink-900">{title}</span>
-        <span className="block text-xs text-ink-400">{desc}</span>
-      </span>
-    </button>
+        {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 translate-x-[1px]" />}
+      </button>
+      <button onClick={onSelect} className="min-w-0 flex-1 text-left">
+        <span className="flex items-center gap-2">
+          <span className="font-medium text-ink-900">{v.label}</span>
+          {v.recommended && (
+            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand">
+              рекомендуем
+            </span>
+          )}
+        </span>
+        <span className="block text-xs text-ink-400">{v.desc}</span>
+      </button>
+      {active ? (
+        <Check className="h-5 w-5 shrink-0 text-brand" />
+      ) : (
+        <span className="h-5 w-5 shrink-0 rounded-full border border-black/15" />
+      )}
+    </div>
   )
 }

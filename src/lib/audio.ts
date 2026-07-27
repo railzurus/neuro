@@ -1,4 +1,5 @@
 import { Mp3Encoder } from '@breezystack/lamejs'
+import { FEMALE_VOICE_IDS } from '../data/voices'
 
 /**
  * Audio engine for the dream-life mantra.
@@ -293,12 +294,12 @@ function chunkText(text: string, limit = CHUNK_LIMIT): string[] {
 async function ttsChunk(
   ctx: BaseAudioContext,
   text: string,
-  gender: 'female' | 'male',
+  voice: string,
 ): Promise<AudioBuffer> {
   const res = await fetch(TTS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, gender }),
+    body: JSON.stringify({ text, voice }),
   })
   if (!res.ok) throw new Error(`tts ${res.status}`)
   const bytes = await res.arrayBuffer()
@@ -331,9 +332,9 @@ function concatBuffers(ctx: BaseAudioContext, buffers: AudioBuffer[], gapSec: nu
  */
 export async function synthesizeVoice(
   text: string,
-  gender: 'female' | 'male',
+  voice: string,
 ): Promise<AudioBuffer | null> {
-  const key = gender + '::' + text
+  const key = voice + '::' + text
   const cached = voiceBufferCache.get(key)
   if (cached) return cached
 
@@ -346,7 +347,7 @@ export async function synthesizeVoice(
     const chunks = chunkText(text)
     if (!chunks.length) return null
     const buffers: AudioBuffer[] = []
-    for (const c of chunks) buffers.push(await ttsChunk(ctx, c, gender))
+    for (const c of chunks) buffers.push(await ttsChunk(ctx, c, voice))
     const merged = buffers.length === 1 ? buffers[0] : concatBuffers(ctx, buffers, CHUNK_GAP)
     voiceBufferCache.set(key, merged)
     return merged
@@ -371,10 +372,12 @@ export class MantraSession {
     return this.ctx !== null && !this.stopped
   }
 
-  start(text: string, gender: 'female' | 'male', cb: SessionCallbacks = {}) {
+  start(text: string, voice: string, cb: SessionCallbacks = {}) {
     this.stop() // clean any previous run
     this.stopped = false
     this.cb = cb
+    // Gender is only needed for the browser-speech fallback.
+    const gender: 'female' | 'male' = FEMALE_VOICE_IDS.has(voice) ? 'female' : 'male'
 
     const AC = window.AudioContext || (window as any).webkitAudioContext
     this.ctx = new AC()
@@ -382,7 +385,7 @@ export class MantraSession {
     // Prefer real SpeakKit voice (mixable + downloadable); if unavailable,
     // fall back to the browser SpeechSynthesis voice.
     this.cb.onPreparing?.()
-    synthesizeVoice(text, gender).then((voiceBuffer) => {
+    synthesizeVoice(text, voice).then((voiceBuffer) => {
       if (this.stopped || !this.ctx) return
       this.initBed().then(() => {
         if (this.stopped || !this.ctx) return
