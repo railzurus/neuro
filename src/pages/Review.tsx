@@ -3,7 +3,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, Loader2, Pause, Play, RefreshCw, Wand2 } from 'lucide-react'
 import { useStore, compile } from '../store/useStore'
 import { refineText, wordCount } from '../lib/refine'
-import { VOICES, normalizeVoiceId, type VoiceOption } from '../data/voices'
+import {
+  VOICES,
+  SPEEDS,
+  normalizeVoiceId,
+  normalizeSpeed,
+  type VoiceOption,
+  type SpeedOption,
+} from '../data/voices'
 
 const WPM = 85
 
@@ -16,29 +23,33 @@ export default function Review() {
   const syncFinalFromAnswers = useStore((s) => s.syncFinalFromAnswers)
   const voice = useStore((s) => s.voice)
   const setVoice = useStore((s) => s.setVoice)
+  const speed = useStore((s) => s.speed)
+  const setSpeed = useStore((s) => s.setSpeed)
 
   const [refining, setRefining] = useState(false)
   const [previewing, setPreviewing] = useState<string | null>(null)
   const previewRef = useRef<HTMLAudioElement | null>(null)
 
-  // Migrate any legacy stored voice ('female'/'male') to a valid id.
+  // Migrate any legacy stored voice/speed to valid values.
   useEffect(() => {
-    const norm = normalizeVoiceId(voice)
-    if (norm !== voice) setVoice(norm)
+    const nv = normalizeVoiceId(voice)
+    if (nv !== voice) setVoice(nv)
+    const ns = normalizeSpeed(speed)
+    if (ns !== speed) setSpeed(ns)
     return () => previewRef.current?.pause()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function togglePreview(id: string) {
+  function togglePreview(key: string, src: string) {
     const el = previewRef.current
     if (!el) return
-    if (previewing === id) {
+    if (previewing === key) {
       el.pause()
       setPreviewing(null)
       return
     }
-    el.src = `/voices/${id}.mp3`
-    el.play().then(() => setPreviewing(id)).catch(() => setPreviewing(null))
+    el.src = src
+    el.play().then(() => setPreviewing(key)).catch(() => setPreviewing(null))
   }
 
   const compiled = compile(answers)
@@ -132,12 +143,31 @@ export default function Review() {
         </button>
       </div>
 
+      <audio ref={previewRef} onEnded={() => setPreviewing(null)} className="hidden" />
+
+      {/* Tempo choice */}
+      <h2 className="mt-12 font-serif text-2xl text-ink-900">Выберите темп</h2>
+      <p className="mt-1 text-sm text-ink-500">
+        Насколько медленно читать. Нажмите ▶, чтобы услышать разницу.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {SPEEDS.map((s) => (
+          <SpeedChoice
+            key={s.value}
+            s={s}
+            active={speed === s.value}
+            playing={previewing === `speed-${s.value}`}
+            onSelect={() => setSpeed(s.value)}
+            onPreview={() => togglePreview(`speed-${s.value}`, s.sample)}
+          />
+        ))}
+      </div>
+
       {/* Voice choice */}
       <h2 className="mt-12 font-serif text-2xl text-ink-900">Выберите голос</h2>
       <p className="mt-1 text-sm text-ink-500">
         Нажмите ▶, чтобы послушать пример, и выберите голос для вашей записи.
       </p>
-      <audio ref={previewRef} onEnded={() => setPreviewing(null)} className="hidden" />
 
       {(['female', 'male'] as const).map((g) => (
         <div key={g} className="mt-5">
@@ -152,7 +182,7 @@ export default function Review() {
                 active={voice === v.id}
                 playing={previewing === v.id}
                 onSelect={() => setVoice(v.id)}
-                onPreview={() => togglePreview(v.id)}
+                onPreview={() => togglePreview(v.id, `/voices/${v.id}.mp3`)}
               />
             ))}
           </div>
@@ -220,6 +250,51 @@ function VoiceChoice({
           )}
         </span>
         <span className="block text-xs text-ink-400">{v.desc}</span>
+      </button>
+      {active ? (
+        <Check className="h-5 w-5 shrink-0 text-brand" />
+      ) : (
+        <span className="h-5 w-5 shrink-0 rounded-full border border-black/15" />
+      )}
+    </div>
+  )
+}
+
+function SpeedChoice({
+  s,
+  active,
+  playing,
+  onSelect,
+  onPreview,
+}: {
+  s: SpeedOption
+  active: boolean
+  playing: boolean
+  onSelect: () => void
+  onPreview: () => void
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl border p-4 transition-all ${
+        active
+          ? 'border-brand/60 bg-brand/[0.06] shadow-soft'
+          : 'border-black/[0.07] bg-white'
+      }`}
+    >
+      <button
+        onClick={onPreview}
+        aria-label={playing ? 'Остановить' : 'Прослушать'}
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors ${
+          playing
+            ? 'bg-brand text-white'
+            : 'bg-black/[0.04] text-ink-600 hover:bg-brand/10 hover:text-brand'
+        }`}
+      >
+        {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 translate-x-[1px]" />}
+      </button>
+      <button onClick={onSelect} className="min-w-0 flex-1 text-left">
+        <span className="block font-medium text-ink-900">{s.label}</span>
+        <span className="block text-xs text-ink-400">{s.hint}</span>
       </button>
       {active ? (
         <Check className="h-5 w-5 shrink-0 text-brand" />

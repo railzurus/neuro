@@ -20,6 +20,7 @@ type PlayState = 'idle' | 'preparing' | 'playing' | 'paused' | 'done'
 export default function Listen() {
   const finalText = useStore((s) => s.finalText)
   const voice = useStore((s) => s.voice)
+  const speed = useStore((s) => s.speed)
 
   const sessionRef = useRef<MantraSession | null>(null)
   const [state, setState] = useState<PlayState>('idle')
@@ -45,7 +46,7 @@ export default function Listen() {
     setState('preparing')
     // На сайте озвучиваем только короткое превью (~30 с); полный текст —
     // при скачивании. Это быстрее и экономит синтез.
-    session.start(previewText(finalText), voice, {
+    session.start(previewText(finalText), voice, speed, {
       onReady: () => setState('playing'),
       onProgress: (f) => setProgress(f),
       onEnd: () => setState('done'),
@@ -74,7 +75,7 @@ export default function Listen() {
     setRendering(true)
     try {
       // Real voice from SpeakKit if configured; otherwise music-only.
-      const voiceBuffer = await synthesizeVoice(finalText, voice)
+      const voiceBuffer = await synthesizeVoice(finalText, voice, speed)
       const dur = voiceBuffer ? voiceBuffer.duration + 8 : bedSeconds
       const blob = await renderMix(dur, voiceBuffer)
       const url = URL.createObjectURL(blob)

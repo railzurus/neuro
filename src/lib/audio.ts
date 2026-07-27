@@ -295,11 +295,12 @@ async function ttsChunk(
   ctx: BaseAudioContext,
   text: string,
   voice: string,
+  speed: number,
 ): Promise<AudioBuffer> {
   const res = await fetch(TTS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice }),
+    body: JSON.stringify({ text, voice, speed }),
   })
   if (!res.ok) throw new Error(`tts ${res.status}`)
   const bytes = await res.arrayBuffer()
@@ -333,8 +334,9 @@ function concatBuffers(ctx: BaseAudioContext, buffers: AudioBuffer[], gapSec: nu
 export async function synthesizeVoice(
   text: string,
   voice: string,
+  speed: number,
 ): Promise<AudioBuffer | null> {
-  const key = voice + '::' + text
+  const key = voice + '@' + speed + '::' + text
   const cached = voiceBufferCache.get(key)
   if (cached) return cached
 
@@ -347,7 +349,7 @@ export async function synthesizeVoice(
     const chunks = chunkText(text)
     if (!chunks.length) return null
     const buffers: AudioBuffer[] = []
-    for (const c of chunks) buffers.push(await ttsChunk(ctx, c, voice))
+    for (const c of chunks) buffers.push(await ttsChunk(ctx, c, voice, speed))
     const merged = buffers.length === 1 ? buffers[0] : concatBuffers(ctx, buffers, CHUNK_GAP)
     voiceBufferCache.set(key, merged)
     return merged
@@ -372,7 +374,7 @@ export class MantraSession {
     return this.ctx !== null && !this.stopped
   }
 
-  start(text: string, voice: string, cb: SessionCallbacks = {}) {
+  start(text: string, voice: string, speed: number, cb: SessionCallbacks = {}) {
     this.stop() // clean any previous run
     this.stopped = false
     this.cb = cb
@@ -385,7 +387,7 @@ export class MantraSession {
     // Prefer real SpeakKit voice (mixable + downloadable); if unavailable,
     // fall back to the browser SpeechSynthesis voice.
     this.cb.onPreparing?.()
-    synthesizeVoice(text, voice).then((voiceBuffer) => {
+    synthesizeVoice(text, voice, speed).then((voiceBuffer) => {
       if (this.stopped || !this.ctx) return
       this.initBed().then(() => {
         if (this.stopped || !this.ctx) return

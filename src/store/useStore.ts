@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { ROLES } from '../data/roles'
-import { DEFAULT_VOICE } from '../data/voices'
+import { DEFAULT_VOICE, DEFAULT_SPEED } from '../data/voices'
 
 interface State {
   /** roleId -> user's answer text */
@@ -17,12 +17,15 @@ interface State {
   finalSnapshot: string
   /** Selected SpeechKit voice id (see data/voices.ts). */
   voice: string
+  /** Narration tempo multiplier. */
+  speed: number
   setAnswer: (roleId: string, text: string) => void
   /** Manual edit of the final story — does NOT move the snapshot. */
   setFinalText: (text: string) => void
   /** Force finalText to the current compiled answers (and move the snapshot). */
   syncFinalFromAnswers: () => void
   setVoice: (v: string) => void
+  setSpeed: (v: number) => void
   compileStory: () => string
   reset: () => void
 }
@@ -40,6 +43,7 @@ export const useStore = create<State>()(
       finalText: '',
       finalSnapshot: '',
       voice: DEFAULT_VOICE,
+      speed: DEFAULT_SPEED,
       setAnswer: (roleId, text) =>
         set((s) => ({ answers: { ...s.answers, [roleId]: text } })),
       setFinalText: (text) => set({ finalText: text }),
@@ -48,9 +52,16 @@ export const useStore = create<State>()(
         set({ finalText: text, finalSnapshot: text })
       },
       setVoice: (v) => set({ voice: v }),
+      setSpeed: (v) => set({ speed: v }),
       compileStory: () => compile(get().answers),
       reset: () =>
-        set({ answers: {}, finalText: '', finalSnapshot: '', voice: 'female' }),
+        set({
+          answers: {},
+          finalText: '',
+          finalSnapshot: '',
+          voice: DEFAULT_VOICE,
+          speed: DEFAULT_SPEED,
+        }),
     }),
     { name: 'dream-life-story' },
   ),
