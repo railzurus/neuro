@@ -8,7 +8,7 @@ export default function App() {
   return (
     <div className="aurora-bg min-h-full flex flex-col">
       <header className="w-full">
-        <div className="mx-auto max-w-5xl px-6 py-5 flex items-center justify-between">
+        <div className="relative mx-auto flex max-w-5xl items-center justify-center px-6 py-5">
           <Link to="/" className="group">
             <span className="font-serif text-lg tracking-wide text-ink-900 group-hover:text-brand transition-colors">
               Жизнь мечты
@@ -17,7 +17,7 @@ export default function App() {
           {!isHome && (
             <Link
               to="/"
-              className="text-sm text-ink-500 hover:text-ink-900 transition-colors"
+              className="absolute right-6 top-1/2 -translate-y-1/2 text-sm text-ink-500 hover:text-ink-900 transition-colors"
             >
               На главную
             </Link>
