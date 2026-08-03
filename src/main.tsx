@@ -7,6 +7,7 @@ import Intro from './pages/Intro'
 import Compose from './pages/Compose'
 import Review from './pages/Review'
 import Listen from './pages/Listen'
+import Privacy from './pages/Privacy'
 
 const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: 'compose', element: <Compose /> },
       { path: 'review', element: <Review /> },
       { path: 'listen', element: <Listen /> },
+      { path: 'privacy', element: <Privacy /> },
     ],
   },
 ])
