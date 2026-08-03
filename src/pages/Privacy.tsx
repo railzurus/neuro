@@ -3,25 +3,9 @@
  * предоставленный юристом. Домен Сервиса — медитациямечты.рф.
  * Оператор — ООО «ЗУРУС ТЕХНОЛОГИИ».
  */
+import { LegalHeading as H2, LegalTerm as Term } from '../components/Legal'
 
 const SITE_URL = 'https://медитациямечты.рф'
-
-function Term({ term, children }: { term: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-1 rounded-2xl glass p-4 sm:grid-cols-[minmax(9rem,12rem)_1fr] sm:gap-4">
-      <dt className="font-medium text-ink-900">{term}</dt>
-      <dd className="text-ink-600">{children}</dd>
-    </div>
-  )
-}
-
-function H2({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="font-serif text-2xl text-ink-900 border-t border-black/[0.06] pt-8">
-      {children}
-    </h2>
-  )
-}
 
 export default function Privacy() {
   return (

@@ -50,8 +50,37 @@ export default function App() {
         <Outlet />
       </main>
 
-      <footer className="w-full">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-6 py-8 text-center text-xs text-ink-400">
+      <footer className="w-full border-t border-black/[0.06]">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-5 px-6 py-10 text-center text-xs text-ink-400">
+          {/* Документы сервиса — собраны в одном месте (требование РКН) */}
+          <nav aria-label="Документы сервиса" className="flex flex-col items-center gap-2">
+            <span className="text-[0.7rem] uppercase tracking-wider text-ink-400/80">
+              Документы
+            </span>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              <Link
+                to="/privacy"
+                className="text-ink-600 hover:text-brand transition-colors"
+              >
+                Политика обработки персональных данных
+              </Link>
+              <Link
+                to="/terms"
+                className="text-ink-600 hover:text-brand transition-colors"
+              >
+                Пользовательское соглашение
+              </Link>
+            </div>
+          </nav>
+
+          <a
+            href="mailto:ceo@zurus.tech?subject=Отзыв о сервисе «Прояви жизнь своей мечты»"
+            className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-4 py-1.5 text-ink-600 shadow-soft transition-colors hover:border-brand/40 hover:text-brand"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            Отправить отзыв
+          </a>
+
           <p>
             Сервис разработан компанией{' '}
             <a
@@ -63,16 +92,6 @@ export default function App() {
               ZURUS.TECH
             </a>
           </p>
-          <a
-            href="mailto:ceo@zurus.tech?subject=Отзыв о сервисе «Прояви жизнь своей мечты»"
-            className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-4 py-1.5 text-ink-600 shadow-soft transition-colors hover:border-brand/40 hover:text-brand"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            Отправить отзыв
-          </a>
-          <Link to="/privacy" className="text-ink-400 hover:text-brand transition-colors">
-            Политика обработки персональных данных
-          </Link>
         </div>
       </footer>
 

@@ -4,6 +4,7 @@ import { Download, Loader2, Pause, Play, RotateCcw, Headphones } from 'lucide-re
 import { useStore } from '../store/useStore'
 import { wordCount } from '../lib/refine'
 import { voiceById } from '../data/voices'
+import { PaymentConsentNote } from '../components/Legal'
 import {
   MantraSession,
   loadVoices,
@@ -204,6 +205,7 @@ export default function Listen() {
           )}
           {rendering ? 'Готовим файл…' : 'Скачать запись (MP3)'}
         </button>
+        <PaymentConsentNote className="mx-auto mt-4 max-w-md" />
       </div>
     </div>
   )

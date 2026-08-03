@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Moon, Sparkles } from 'lucide-react'
 import { MANIFESTO, RITUAL, ROLES } from '../data/roles'
 import { RoleIconTile } from '../components/RoleIcon'
+import { StartConsentNote } from '../components/Legal'
 
 export default function Intro() {
   return (
@@ -33,6 +34,7 @@ export default function Intro() {
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
           <span className="text-xs text-ink-400">Занимает 10–15 минут</span>
+          <StartConsentNote className="mt-1 max-w-md text-center" />
         </div>
       </section>
 
@@ -107,6 +109,7 @@ export default function Intro() {
             Начать
             <ArrowRight className="h-4 w-4" />
           </Link>
+          <StartConsentNote className="mx-auto mt-4 max-w-md" />
         </div>
       </section>
     </div>

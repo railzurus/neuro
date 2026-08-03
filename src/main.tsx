@@ -8,6 +8,8 @@ import Compose from './pages/Compose'
 import Review from './pages/Review'
 import Listen from './pages/Listen'
 import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import Consent from './pages/Consent'
 
 const router = createBrowserRouter([
   {
@@ -19,6 +21,8 @@ const router = createBrowserRouter([
       { path: 'review', element: <Review /> },
       { path: 'listen', element: <Listen /> },
       { path: 'privacy', element: <Privacy /> },
+      { path: 'terms', element: <Terms /> },
+      { path: 'consent', element: <Consent /> },
     ],
   },
 ])
