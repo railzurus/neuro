@@ -1,22 +1,20 @@
 /**
- * Модель заказа и её временное хранилище.
+ * Заказы: обращение к серверному API (api/order-*.php).
  *
- * СТАТУС: заглушка. Заказы лежат в localStorage браузера.
- * Когда появится backend (см. docs/payment-order-flow.md), эти функции
- * заменяются вызовами api/order-create.php, api/order.php, api/order-email.php —
- * поля Order намеренно повторяют схему таблицы `orders`, чтобы замена была точечной.
+ * Источник правды — сервер. Заказ переживает закрытие вкладки, смену
+ * устройства и сбой сети, ссылка приходит письмом (docs/payment-order-flow.md).
  *
- * Ограничение заглушки: заказ живёт только в этом браузере. Настоящая защита
- * «оплатил, но не скачал» появится вместе с серверным хранением.
+ * Локальная разработка: PHP под Vite не выполняется, поэтому в dev-режиме
+ * при недоступном API используется заглушка на localStorage. В production-сборке
+ * заглушки нет — ошибка API видна пользователю, чтобы «оплатил, но заказ
+ * не сохранился» не прошло незамеченным.
  */
 
 /** Стоимость услуги, ₽ (зафиксирована в Пользовательском соглашении). */
 export const PRICE_RUB = 499
 
-/** Сколько дней живёт ссылка на заказ (см. раздел retention в ТЗ). */
+/** Сколько дней живёт ссылка на заказ (сервер — источник правды). */
 export const ORDER_TTL_DAYS = 14
-
-const STORAGE_KEY = 'dream-life-orders'
 
 /** Параметры генерации — то, из чего заново создаётся запись. */
 export interface OrderParams {
@@ -27,103 +25,101 @@ export interface OrderParams {
 
 export interface Order {
   token: string
-  status: 'pending' | 'paid'
+  status: 'pending' | 'paid' | 'canceled' | 'refunded'
   amount: number
-  currency: 'RUB'
+  currency: string
   email: string
-  /** Содержит текст пользователя — ПДн. Обнуляется по истечении срока. */
+  /** null, если заказ не оплачен или срок ссылки истёк. */
   params: OrderParams | null
-  createdAt: string
-  paidAt: string | null
   expiresAt: string
+  expired: boolean
 }
 
-type OrderMap = Record<string, Order>
+export interface CreatedOrder {
+  token: string
+  status: Order['status']
+  orderUrl: string
+  /** Ссылка на оплату в ЮKassa. Пока оплата не подключена — null. */
+  confirmationUrl: string | null
+}
 
-function readAll(): OrderMap {
+const DEV = import.meta.env.DEV
+
+/** Ошибка, которую можно показать пользователю. */
+export class OrderError extends Error {}
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new OrderError((data && data.error) || 'Ошибка сервера')
+  }
+  // Ответ не JSON (в dev так отвечает Vite, на бою — фатальная ошибка PHP,
+  // отдающая HTML со статусом 200). Успехом это считать нельзя.
+  if (!data || typeof data !== 'object') {
+    throw new OrderError('Сервер вернул неожиданный ответ')
+  }
+  return data as T
+}
+
+/** Создаёт заказ — POST /api/order-create.php */
+export async function createOrder(
+  params: OrderParams,
+  email: string,
+): Promise<CreatedOrder> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as OrderMap) : {}
-  } catch {
-    return {}
+    return await postJson<CreatedOrder>('/api/order-create.php', {
+      params,
+      email,
+      consent: true,
+    })
+  } catch (e) {
+    if (DEV) return devStub.create(params, email)
+    throw e instanceof OrderError
+      ? e
+      : new OrderError('Не удалось создать заказ. Проверьте соединение.')
   }
 }
 
-function writeAll(orders: OrderMap): void {
+/** Загружает заказ — GET /api/order.php */
+export async function getOrder(token: string): Promise<Order | null> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(orders))
-  } catch {
-    /* приватный режим — заказ просто не сохранится */
+    const res = await fetch(`/api/order.php?token=${encodeURIComponent(token)}`)
+    if (res.status === 404) return null
+    if (!res.ok) throw new OrderError('Ошибка сервера')
+    return (await res.json()) as Order
+  } catch (e) {
+    if (DEV) return devStub.get(token)
+    throw e instanceof OrderError
+      ? e
+      : new OrderError('Не удалось загрузить заказ. Проверьте соединение.')
   }
-}
-
-/** Неугадываемый идентификатор заказа (на сервере — bin2hex(random_bytes(32))). */
-function makeToken(): string {
-  const bytes = new Uint8Array(32)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-/** Создаёт заказ в статусе pending — аналог POST /api/order-create.php. */
-export function createOrder(params: OrderParams, email: string): Order {
-  const now = new Date()
-  const expires = new Date(now.getTime() + ORDER_TTL_DAYS * 24 * 60 * 60 * 1000)
-  const order: Order = {
-    token: makeToken(),
-    status: 'pending',
-    amount: PRICE_RUB,
-    currency: 'RUB',
-    email,
-    params,
-    createdAt: now.toISOString(),
-    paidAt: null,
-    expiresAt: expires.toISOString(),
-  }
-  const all = readAll()
-  all[order.token] = order
-  writeAll(all)
-  return order
 }
 
 /**
- * Отмечает заказ оплаченным.
- *
- * На бою это делает api/yookassa-webhook.php после проверки платежа —
- * фронтенд сам никогда не должен переводить заказ в paid.
+ * Отправляет ссылку на заказ письмом — POST /api/order-email.php
+ * Если передан email — сначала меняет адрес доставки.
  */
-export function markPaid(token: string): Order | null {
-  const all = readAll()
-  const order = all[token]
-  if (!order) return null
-  order.status = 'paid'
-  order.paidAt = new Date().toISOString()
-  writeAll(all)
-  return order
-}
-
-/** Аналог GET /api/order.php?token=… */
-export function getOrder(token: string): Order | null {
-  const order = readAll()[token]
-  if (!order) return null
-  // Срок вышел — параметры считаются удалёнными (на сервере это делает cron).
-  if (isExpired(order) && order.params) {
-    return { ...order, params: null }
+export async function sendOrderLink(
+  token: string,
+  email?: string,
+): Promise<string> {
+  try {
+    const data = await postJson<{ email: string }>('/api/order-email.php', {
+      token,
+      ...(email ? { email } : {}),
+    })
+    return data.email
+  } catch (e) {
+    if (DEV) return devStub.send(token, email)
+    throw e instanceof OrderError
+      ? e
+      : new OrderError('Не удалось отправить письмо. Попробуйте позже.')
   }
-  return order
-}
-
-export function isExpired(order: Order): boolean {
-  return new Date(order.expiresAt).getTime() < Date.now()
-}
-
-/** Смена адреса доставки — аналог POST /api/order-email.php */
-export function setOrderEmail(token: string, email: string): Order | null {
-  const all = readAll()
-  const order = all[token]
-  if (!order) return null
-  order.email = email
-  writeAll(all)
-  return order
 }
 
 /** Простая проверка адреса — от опечаток, не от злого умысла. */
@@ -137,4 +133,60 @@ export function formatDate(iso: string): string {
     month: 'long',
     year: 'numeric',
   })
+}
+
+/* ------------------------------------------------------------------ */
+/* Заглушка для локальной разработки (только при import.meta.env.DEV)  */
+/* ------------------------------------------------------------------ */
+
+const DEV_KEY = 'dream-life-orders-dev'
+
+const devStub = {
+  readAll(): Record<string, Order> {
+    try {
+      return JSON.parse(localStorage.getItem(DEV_KEY) || '{}')
+    } catch {
+      return {}
+    }
+  },
+  writeAll(all: Record<string, Order>) {
+    localStorage.setItem(DEV_KEY, JSON.stringify(all))
+  },
+  create(params: OrderParams, email: string): CreatedOrder {
+    const bytes = new Uint8Array(32)
+    crypto.getRandomValues(bytes)
+    const token = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    const expires = new Date(Date.now() + ORDER_TTL_DAYS * 86400000)
+    const order: Order = {
+      token,
+      status: 'paid',
+      amount: PRICE_RUB,
+      currency: 'RUB',
+      email,
+      params,
+      expiresAt: expires.toISOString(),
+      expired: false,
+    }
+    const all = devStub.readAll()
+    all[token] = order
+    devStub.writeAll(all)
+    console.info('[orders] dev-заглушка: заказ создан локально', token.slice(0, 8))
+    return { token, status: 'paid', orderUrl: `/order/${token}`, confirmationUrl: null }
+  },
+  get(token: string): Order | null {
+    const order = devStub.readAll()[token]
+    if (!order) return null
+    const expired = new Date(order.expiresAt).getTime() < Date.now()
+    return expired ? { ...order, expired: true, params: null } : order
+  },
+  send(token: string, email?: string): string {
+    const all = devStub.readAll()
+    const order = all[token]
+    if (order && email) {
+      order.email = email
+      devStub.writeAll(all)
+    }
+    console.info('[orders] dev-заглушка: письмо не отправлено')
+    return order ? order.email : (email ?? '')
+  },
 }

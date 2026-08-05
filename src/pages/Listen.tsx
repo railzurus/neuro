@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore'
 import { wordCount } from '../lib/refine'
 import { voiceById } from '../data/voices'
 import { PaymentConsentNote } from '../components/Legal'
-import { PRICE_RUB, createOrder, isValidEmail, markPaid } from '../lib/orders'
+import { PRICE_RUB, createOrder, isValidEmail } from '../lib/orders'
 import { MantraSession, loadVoices, preloadMusic, previewText } from '../lib/audio'
 
 const WPM = 85
@@ -27,6 +27,8 @@ export default function Listen() {
   const [step, setStep] = useState<'idle' | 'email' | 'confirm'>('idle')
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState('')
 
   const words = useMemo(() => wordCount(finalText), [finalText])
   const seconds = Math.max(Math.round((words / WPM) * 60), 60)
@@ -78,14 +80,23 @@ export default function Listen() {
     setStep('confirm')
   }
 
-  function pay() {
-    const order = createOrder({ finalText, voice, speed }, email.trim())
-    // СТАБ: ЮKassa пока не подключена. Сразу считаем платёж успешным и ведём
-    // на страницу заказа — тот же адрес, куда касса будет возвращать после оплаты.
-    // При подключении здесь останется только редирект на confirmation_url,
-    // а в paid заказ переведёт api/yookassa-webhook.php.
-    markPaid(order.token)
-    navigate(`/order/${order.token}`)
+  async function pay() {
+    if (paying) return
+    setPaying(true)
+    setPayError('')
+    try {
+      const order = await createOrder({ finalText, voice, speed }, email.trim())
+      // Когда ЮKassa подключится, сервер вернёт confirmationUrl — уводим на кассу.
+      // Пока оплаты нет, заказ создаётся сразу оплаченным и мы ведём на выдачу.
+      if (order.confirmationUrl) {
+        window.location.href = order.confirmationUrl
+        return
+      }
+      navigate(order.orderUrl)
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : 'Не удалось создать заказ.')
+      setPaying(false)
+    }
   }
 
   if (!finalText.trim()) {
@@ -247,9 +258,13 @@ export default function Listen() {
               Проверьте адрес — если в нём опечатка, письмо не дойдёт.
             </p>
             <div className="mt-5 flex flex-col items-center gap-3">
-              <button onClick={pay} className="btn-primary">
-                <CreditCard className="h-4 w-4" />
-                Перейти к оплате · {PRICE_RUB} ₽
+              <button onClick={pay} disabled={paying} className="btn-primary">
+                {paying ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CreditCard className="h-4 w-4" />
+                )}
+                {paying ? 'Оформляем заказ…' : `Перейти к оплате · ${PRICE_RUB} ₽`}
               </button>
               <button
                 onClick={() => setStep('email')}
@@ -258,6 +273,11 @@ export default function Listen() {
                 Изменить адрес
               </button>
             </div>
+            {payError && (
+              <p className="mx-auto mt-4 max-w-sm rounded-xl border border-[#e7b3c2] bg-[#fceef2] p-3 text-sm text-[#c0507a]">
+                {payError}
+              </p>
+            )}
             <PaymentConsentNote className="mx-auto mt-5 max-w-md" />
           </div>
         )}

@@ -8,31 +8,50 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Check, Download, Loader2, Mail, Pencil } from 'lucide-react'
-import {
-  formatDate,
-  getOrder,
-  isValidEmail,
-  setOrderEmail,
-  type Order,
-} from '../lib/orders'
+import { formatDate, getOrder, isValidEmail, sendOrderLink, type Order } from '../lib/orders'
 import { downloadMantra } from '../lib/deliver'
 import { preloadMusic } from '../lib/audio'
 
+type LoadState = 'loading' | 'ready' | 'notfound' | 'error'
+
 export default function OrderPage() {
   const { token = '' } = useParams()
-  const [order, setOrder] = useState<Order | null | undefined>(undefined)
+  const [load, setLoad] = useState<LoadState>('loading')
+  const [order, setOrder] = useState<Order | null>(null)
+  const [loadError, setLoadError] = useState('')
+
   const [rendering, setRendering] = useState(false)
   const [error, setError] = useState('')
 
-  // Смена адреса доставки
+  // Доставка на почту
   const [editingEmail, setEditingEmail] = useState(false)
   const [emailDraft, setEmailDraft] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
   useEffect(() => {
-    setOrder(getOrder(token))
+    let cancelled = false
+    setLoad('loading')
+    getOrder(token)
+      .then((found) => {
+        if (cancelled) return
+        if (!found) {
+          setLoad('notfound')
+          return
+        }
+        setOrder(found)
+        setLoad('ready')
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить заказ.')
+        setLoad('error')
+      })
     preloadMusic()
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
   async function handleDownload() {
@@ -49,27 +68,33 @@ export default function OrderPage() {
     }
   }
 
+  async function deliver(email?: string) {
+    if (sending) return
+    setSending(true)
+    setEmailError('')
+    try {
+      const saved = await sendOrderLink(token, email)
+      setOrder((prev) => (prev ? { ...prev, email: saved } : prev))
+      setEditingEmail(false)
+      setSent(true)
+      window.setTimeout(() => setSent(false), 4000)
+    } catch (e) {
+      setEmailError(e instanceof Error ? e.message : 'Не удалось отправить письмо.')
+    } finally {
+      setSending(false)
+    }
+  }
+
   function saveEmail() {
     const value = emailDraft.trim()
     if (!isValidEmail(value)) {
       setEmailError('Проверьте адрес — кажется, в нём опечатка.')
       return
     }
-    const updated = setOrderEmail(token, value)
-    if (updated) setOrder({ ...updated })
-    setEditingEmail(false)
-    setEmailError('')
-    sendLink()
+    deliver(value)
   }
 
-  function sendLink() {
-    // TODO: заменить на POST /api/order-email.php, когда появится backend.
-    // Сейчас письма не отправляются — показываем только подтверждение в интерфейсе.
-    setSent(true)
-    window.setTimeout(() => setSent(false), 4000)
-  }
-
-  if (order === undefined) {
+  if (load === 'loading') {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center text-ink-500">
         <Loader2 className="mx-auto h-5 w-5 animate-spin" />
@@ -77,7 +102,19 @@ export default function OrderPage() {
     )
   }
 
-  if (!order) {
+  if (load === 'error') {
+    return (
+      <div className="mx-auto max-w-md px-6 py-20 text-center">
+        <h1 className="font-serif text-3xl text-ink-900">Не удалось открыть заказ</h1>
+        <p className="mt-3 text-ink-500 leading-relaxed">{loadError}</p>
+        <button onClick={() => window.location.reload()} className="btn-primary mt-7">
+          Попробовать ещё раз
+        </button>
+      </div>
+    )
+  }
+
+  if (load === 'notfound' || !order) {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">
         <h1 className="font-serif text-3xl text-ink-900">Заказ не найден</h1>
@@ -91,7 +128,19 @@ export default function OrderPage() {
     )
   }
 
-  if (!order.params) {
+  if (order.status !== 'paid') {
+    return (
+      <div className="mx-auto max-w-md px-6 py-20 text-center">
+        <h1 className="font-serif text-3xl text-ink-900">Заказ ожидает оплаты</h1>
+        <p className="mt-3 text-ink-500 leading-relaxed">
+          Как только платёж подтвердится, запись станет доступна на этой странице.
+          Обновите её через минуту.
+        </p>
+      </div>
+    )
+  }
+
+  if (order.expired || !order.params) {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">
         <h1 className="font-serif text-3xl text-ink-900">Ссылка больше не активна</h1>
@@ -120,11 +169,7 @@ export default function OrderPage() {
 
       {/* Скачивание */}
       <div className="mt-10 rounded-3xl glass p-8">
-        <button
-          onClick={handleDownload}
-          disabled={rendering}
-          className="btn-primary"
-        >
+        <button onClick={handleDownload} disabled={rendering} className="btn-primary">
           {rendering ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -160,11 +205,10 @@ export default function OrderPage() {
                     className="mt-1.5 w-full rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-ink-900 outline-none focus:border-brand/50"
                   />
                 </label>
-                {emailError && (
-                  <p className="text-xs text-[#c0507a]">{emailError}</p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={saveEmail} className="btn-primary">
+                {emailError && <p className="text-xs text-[#c0507a]">{emailError}</p>}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button onClick={saveEmail} disabled={sending} className="btn-primary">
+                    {sending && <Loader2 className="h-4 w-4 animate-spin" />}
                     Сохранить и отправить
                   </button>
                   <button
@@ -186,15 +230,17 @@ export default function OrderPage() {
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-4">
                   <button
-                    onClick={sendLink}
-                    className="text-sm text-brand hover:underline"
+                    onClick={() => deliver()}
+                    disabled={sending}
+                    className="text-sm text-brand hover:underline disabled:opacity-50"
                   >
-                    Отправить ещё раз
+                    {sending ? 'Отправляем…' : 'Отправить ещё раз'}
                   </button>
                   <button
                     onClick={() => {
                       setEmailDraft(order.email)
                       setEditingEmail(true)
+                      setEmailError('')
                     }}
                     className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900"
                   >
@@ -204,9 +250,11 @@ export default function OrderPage() {
                 </div>
                 {sent && (
                   <p className="mt-3 text-xs text-brand">
-                    Письмо отправлено. Если его нет во «Входящих», проверьте
-                    «Спам».
+                    Письмо отправлено. Если его нет во «Входящих», проверьте «Спам».
                   </p>
+                )}
+                {emailError && (
+                  <p className="mt-3 text-xs text-[#c0507a]">{emailError}</p>
                 )}
               </>
             )}
