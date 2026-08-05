@@ -249,26 +249,46 @@ const CHUNK_GAP = 0.35
 
 const voiceBufferCache = new Map<string, AudioBuffer>()
 
-/**
- * First whole sentences up to ~targetWords — a short on-site preview
- * (~30 s at ≈90 words/min). The full text is used only for the download.
- */
-/**
- * Жёсткий предел длины превью.
- *
- * Сервер разрешает анонимный синтез только короткого текста (см. tts.php),
- * а набор по предложениям может дать сколько угодно, если пользователь пишет
- * без точек — тогда весь текст считается одним предложением. Поэтому режем.
- */
-const PREVIEW_MAX_CHARS = 1200
+/** Целевая длина бесплатного превью в словах (~15 с при ≈85 слов/мин). */
+const PREVIEW_TARGET_WORDS = 20
 
-export function previewText(full: string, targetWords = 45): string {
+/**
+ * Жёсткий предел по словам: набор идёт целыми предложениями, поэтому одно
+ * длинное предложение иначе растянуло бы превью далеко за 15 секунд.
+ */
+const PREVIEW_MAX_WORDS = 24
+
+/**
+ * Страховка по символам. Сервер разрешает анонимный синтез только короткого
+ * текста (см. tts.php), а если пользователь пишет без точек, весь текст
+ * считается одним предложением.
+ */
+const PREVIEW_MAX_CHARS = 400
+
+/** Обрезает текст до N слов. */
+function limitWords(text: string, max: number): string {
+  const words = text.split(/\s+/).filter(Boolean)
+  return words.length <= max ? text : words.slice(0, max).join(' ')
+}
+
+/** Обрезает текст до N символов по границе слова. */
+function limitChars(text: string, max: number): string {
+  if (text.length <= max) return text
+  const cut = text.slice(0, max)
+  const lastSpace = cut.lastIndexOf(' ')
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trim()
+}
+
+/**
+ * Первые целые предложения — короткое бесплатное превью на сайте (~15 с).
+ * Полный текст озвучивается только в оплаченном заказе.
+ */
+export function previewText(full: string, targetWords = PREVIEW_TARGET_WORDS): string {
   const sentences = splitSentences(full)
-  const source = sentences.length ? null : full.trim()
   let result: string
 
-  if (source !== null) {
-    result = source
+  if (!sentences.length) {
+    result = full.trim()
   } else {
     const out: string[] = []
     let words = 0
@@ -280,11 +300,7 @@ export function previewText(full: string, targetWords = 45): string {
     result = out.join(' ')
   }
 
-  if (result.length <= PREVIEW_MAX_CHARS) return result
-  // Обрезаем по границе слова, чтобы не оборвать на середине.
-  const cut = result.slice(0, PREVIEW_MAX_CHARS)
-  const lastSpace = cut.lastIndexOf(' ')
-  return (lastSpace > PREVIEW_MAX_CHARS * 0.6 ? cut.slice(0, lastSpace) : cut).trim()
+  return limitChars(limitWords(result, PREVIEW_MAX_WORDS), PREVIEW_MAX_CHARS)
 }
 
 /** Split text into request-sized chunks on sentence boundaries. */

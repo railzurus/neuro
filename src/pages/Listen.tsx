@@ -45,7 +45,7 @@ export default function Listen() {
     sessionRef.current = session
     setProgress(0)
     setState('preparing')
-    // На сайте озвучиваем только короткое превью (~30 с); полный текст —
+    // На сайте озвучиваем только короткое превью (~15 с); полный текст —
     // при скачивании. Это быстрее и экономит синтез.
     session.start(previewText(finalText), voice, speed, {
       onReady: () => setState('playing'),
@@ -127,7 +127,7 @@ export default function Listen() {
       <p className="mx-auto mt-2 max-w-md text-ink-600 leading-relaxed">
         Голос <span className="text-ink-900">{voiceById(voice).label}</span> читает
         вашу историю в медленном темпе на фоне альфа-волн. Здесь звучит короткое
-        превью (~30 секунд) — полная запись доступна при скачивании.
+        превью (~15 секунд) — полная запись доступна при скачивании.
       </p>
 
       {/* Breathing orb */}
