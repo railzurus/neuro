@@ -10,6 +10,7 @@ import Listen from './pages/Listen'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import Consent from './pages/Consent'
+import Order from './pages/Order'
 
 const router = createBrowserRouter([
   {
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
       { path: 'compose', element: <Compose /> },
       { path: 'review', element: <Review /> },
       { path: 'listen', element: <Listen /> },
+      { path: 'order/:token', element: <Order /> },
       { path: 'privacy', element: <Privacy /> },
       { path: 'terms', element: <Terms /> },
       { path: 'consent', element: <Consent /> },
