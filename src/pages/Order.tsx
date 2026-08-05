@@ -8,7 +8,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Check, Download, Loader2, Mail, Pencil } from 'lucide-react'
-import { formatDate, getOrder, isValidEmail, sendOrderLink, type Order } from '../lib/orders'
+import {
+  OrderError,
+  formatDate,
+  getOrder,
+  isValidEmail,
+  sendOrderLink,
+  type Order,
+} from '../lib/orders'
 import { downloadMantra } from '../lib/deliver'
 import { preloadMusic } from '../lib/audio'
 
@@ -59,10 +66,18 @@ export default function OrderPage() {
     setRendering(true)
     setError('')
     try {
-      await downloadMantra(order.params)
+      await downloadMantra(order.params, order.token)
+      // Счётчик ведёт сервер; освежаем его, чтобы показать остаток.
+      getOrder(token)
+        .then((fresh) => fresh && setOrder(fresh))
+        .catch(() => {})
     } catch (e) {
       console.error('[order] render failed', e)
-      setError('Не удалось собрать запись. Попробуйте ещё раз.')
+      setError(
+        e instanceof OrderError
+          ? e.message
+          : 'Не удалось собрать запись. Попробуйте ещё раз.',
+      )
     } finally {
       setRendering(false)
     }
@@ -178,8 +193,12 @@ export default function OrderPage() {
           {rendering ? 'Собираем запись…' : 'Скачать запись (MP3)'}
         </button>
         <p className="mx-auto mt-3 max-w-sm text-xs text-ink-400 leading-relaxed">
-          Скачивать можно сколько угодно раз — возвращайтесь на эту страницу по
-          ссылке из письма.
+          Возвращайтесь на эту страницу по ссылке из письма — файл сохраняется
+          в браузере, поэтому повторное скачивание на этом устройстве мгновенно.
+          {order.downloadsUsed > 0 && (
+            <> Пересобрать запись заново можно ещё{' '}
+              {Math.max(order.downloadLimit - order.downloadsUsed, 0)} раз.</>
+          )}
         </p>
         {error && (
           <p className="mx-auto mt-4 max-w-sm rounded-xl border border-[#e7b3c2] bg-[#fceef2] p-3 text-sm text-[#c0507a]">

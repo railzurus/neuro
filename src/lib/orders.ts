@@ -33,6 +33,9 @@ export interface Order {
   params: OrderParams | null
   expiresAt: string
   expired: boolean
+  /** Сколько раз запись уже пересобирали и сколько всего разрешено. */
+  downloadsUsed: number
+  downloadLimit: number
 }
 
 export interface CreatedOrder {
@@ -166,6 +169,8 @@ const devStub = {
       params,
       expiresAt: expires.toISOString(),
       expired: false,
+      downloadsUsed: 0,
+      downloadLimit: 10,
     }
     const all = devStub.readAll()
     all[token] = order

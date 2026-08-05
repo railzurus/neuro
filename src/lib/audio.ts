@@ -253,17 +253,38 @@ const voiceBufferCache = new Map<string, AudioBuffer>()
  * First whole sentences up to ~targetWords — a short on-site preview
  * (~30 s at ≈90 words/min). The full text is used only for the download.
  */
+/**
+ * Жёсткий предел длины превью.
+ *
+ * Сервер разрешает анонимный синтез только короткого текста (см. tts.php),
+ * а набор по предложениям может дать сколько угодно, если пользователь пишет
+ * без точек — тогда весь текст считается одним предложением. Поэтому режем.
+ */
+const PREVIEW_MAX_CHARS = 1200
+
 export function previewText(full: string, targetWords = 45): string {
   const sentences = splitSentences(full)
-  if (!sentences.length) return full.trim()
-  const out: string[] = []
-  let words = 0
-  for (const s of sentences) {
-    out.push(s)
-    words += s.split(/\s+/).filter(Boolean).length
-    if (words >= targetWords) break
+  const source = sentences.length ? null : full.trim()
+  let result: string
+
+  if (source !== null) {
+    result = source
+  } else {
+    const out: string[] = []
+    let words = 0
+    for (const s of sentences) {
+      out.push(s)
+      words += s.split(/\s+/).filter(Boolean).length
+      if (words >= targetWords) break
+    }
+    result = out.join(' ')
   }
-  return out.join(' ')
+
+  if (result.length <= PREVIEW_MAX_CHARS) return result
+  // Обрезаем по границе слова, чтобы не оборвать на середине.
+  const cut = result.slice(0, PREVIEW_MAX_CHARS)
+  const lastSpace = cut.lastIndexOf(' ')
+  return (lastSpace > PREVIEW_MAX_CHARS * 0.6 ? cut.slice(0, lastSpace) : cut).trim()
 }
 
 /** Split text into request-sized chunks on sentence boundaries. */
@@ -296,11 +317,14 @@ async function ttsChunk(
   text: string,
   voice: string,
   speed: number,
+  orderToken?: string,
 ): Promise<AudioBuffer> {
   const res = await fetch(TTS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice, speed }),
+    // Без токена сервер синтезирует только короткое превью — полная длина
+    // доступна лишь по оплаченному заказу (см. api/tts.php).
+    body: JSON.stringify({ text, voice, speed, ...(orderToken ? { orderToken } : {}) }),
   })
   if (!res.ok) throw new Error(`tts ${res.status}`)
   const bytes = await res.arrayBuffer()
@@ -335,6 +359,7 @@ export async function synthesizeVoice(
   text: string,
   voice: string,
   speed: number,
+  orderToken?: string,
 ): Promise<AudioBuffer | null> {
   const key = voice + '@' + speed + '::' + text
   const cached = voiceBufferCache.get(key)
@@ -349,7 +374,7 @@ export async function synthesizeVoice(
     const chunks = chunkText(text)
     if (!chunks.length) return null
     const buffers: AudioBuffer[] = []
-    for (const c of chunks) buffers.push(await ttsChunk(ctx, c, voice, speed))
+    for (const c of chunks) buffers.push(await ttsChunk(ctx, c, voice, speed, orderToken))
     const merged = buffers.length === 1 ? buffers[0] : concatBuffers(ctx, buffers, CHUNK_GAP)
     voiceBufferCache.set(key, merged)
     return merged

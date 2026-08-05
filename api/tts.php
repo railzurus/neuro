@@ -52,6 +52,38 @@ if (mb_strlen($text) > 4900) {
     fail(413, 'Text too long for one request');
 }
 
+/**
+ * Контроль доступа. Синтез стоит денег, поэтому:
+ *  - с токеном оплаченного заказа — полная длина (пересборка купленной записи);
+ *  - без токена — только короткое превью и с ограничением частоты по IP.
+ * Иначе эндпоинт превращается в бесплатный TTS-сервис за наш счёт.
+ */
+const TTS_ANON_MAX_CHARS = 1400;   // превью на сайте ограничено 1200 — с запасом
+const TTS_ANON_PER_HOUR = 40;
+const TTS_ORDER_PER_DAY = 300;     // подстраховка от злоупотребления самим заказом
+
+require_once __DIR__ . '/lib/ratelimit.php';
+
+$orderToken = isset($body['orderToken']) ? trim((string) $body['orderToken']) : '';
+
+if ($orderToken !== '') {
+    require_once __DIR__ . '/lib/orders.php';
+    $order = order_find($orderToken);
+    if (!$order || $order['status'] !== 'paid' || order_is_expired($order)) {
+        fail(403, 'Order is not valid for synthesis');
+    }
+    if (!rate_limit_allow('tts_order', $orderToken, TTS_ORDER_PER_DAY, 86400)) {
+        fail(429, 'Too many requests for this order');
+    }
+} else {
+    if (mb_strlen($text) > TTS_ANON_MAX_CHARS) {
+        fail(403, 'Full synthesis requires a paid order');
+    }
+    if (!rate_limit_allow('tts_anon', api_client_ip(), TTS_ANON_PER_HOUR, 3600)) {
+        fail(429, 'Too many requests, try later');
+    }
+}
+
 $gender = (($body['gender'] ?? 'female') === 'male') ? 'male' : 'female';
 $voice = $gender === 'male' ? 'filipp' : 'alena';
 // Явный выбор голоса (для страницы выбора / примеров).

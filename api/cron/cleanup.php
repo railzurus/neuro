@@ -36,10 +36,15 @@ $stmt = db()->prepare(
 $stmt->execute([db_now(), db_now()]);
 $purged = $stmt->rowCount();
 
-$message = 'purged ' . $purged . ' order(s)';
+// Отметки лимитера нужны только на длину окна (максимум сутки) — остальное мусор.
+$rl = db()->prepare('DELETE FROM rate_limit WHERE hit_at < ?');
+$rl->execute([gmdate('Y-m-d H:i:s', time() - 2 * 86400)]);
+$rlDeleted = $rl->rowCount();
+
+$message = 'purged ' . $purged . ' order(s), ' . $rlDeleted . ' rate-limit row(s)';
 
 if ($isCli) {
     echo $message . PHP_EOL;
 } else {
-    api_ok(['ok' => true, 'purged' => $purged]);
+    api_ok(['ok' => true, 'purged' => $purged, 'rateLimitDeleted' => $rlDeleted]);
 }

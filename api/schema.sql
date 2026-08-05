@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS orders (
   -- JSON { finalText, voice, speed }. СОДЕРЖИТ ПДн — обнуляется по истечении срока.
   params_json      MEDIUMTEXT      DEFAULT NULL,
   params_purged_at DATETIME        DEFAULT NULL,
+  -- Сколько раз запись пересобирали. Каждая пересборка = платный синтез.
+  download_count   INT UNSIGNED    NOT NULL DEFAULT 0,
   created_at       DATETIME        NOT NULL,
   paid_at          DATETIME        DEFAULT NULL,
   delivered_at     DATETIME        DEFAULT NULL,
@@ -44,6 +46,17 @@ CREATE TABLE IF NOT EXISTS consents (
   user_agent   VARCHAR(500)    DEFAULT NULL,
   PRIMARY KEY (id),
   KEY idx_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ограничение частоты обращений: защищает платные API Yandex (синтез речи
+-- и GPT) от использования посторонними в обход оплаты.
+CREATE TABLE IF NOT EXISTS rate_limit (
+  id     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  bucket VARCHAR(32)     NOT NULL,  -- tts_anon | tts_order | refine
+  ident  VARCHAR(64)     NOT NULL,  -- IP или токен заказа
+  hit_at DATETIME        NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_lookup (bucket, ident, hit_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Журнал писем: антиабьюз переотправок и разбор жалоб «письмо не пришло».

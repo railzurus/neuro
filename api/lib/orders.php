@@ -16,6 +16,12 @@ const ORDER_TTL_DAYS = 14;
 const ORDER_MAX_TEXT_LEN = 20000;
 
 /**
+ * Сколько раз можно пересобрать запись по одному заказу.
+ * Файл не хранится, каждая пересборка — платный синтез, поэтому нужен предел.
+ */
+const ORDER_DOWNLOAD_LIMIT = 10;
+
+/**
  * Редакции юридических документов. Фиксируются в журнале согласий,
  * чтобы потом было видно, с какой версией человек согласился.
  * При правке документов — обновить даты здесь.
@@ -76,6 +82,8 @@ function order_public(array $order): array
         'params' => $params,
         'expiresAt' => gmdate('c', strtotime((string) $order['expires_at'])),
         'expired' => $expired,
+        'downloadsUsed' => (int) $order['download_count'],
+        'downloadLimit' => ORDER_DOWNLOAD_LIMIT,
     ];
 }
 

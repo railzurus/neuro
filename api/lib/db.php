@@ -6,8 +6,34 @@
 
 require_once __DIR__ . '/http.php';
 
-/** Возвращает единое подключение PDO (создаётся один раз за запрос). */
+/**
+ * Возвращает подключение PDO или завершает запрос ошибкой 503.
+ * Для мест, где сбой БД не должен ронять запрос, есть db_try().
+ */
 function db(): PDO
+{
+    try {
+        return db_connect();
+    } catch (RuntimeException $e) {
+        // Текст ошибки может содержать реквизиты — наружу его не отдаём.
+        error_log('[db] ' . $e->getMessage());
+        api_fail(503, $e->getCode() === 1 ? 'Database not configured' : 'Database unavailable');
+    }
+}
+
+/** То же, но при сбое возвращает null вместо завершения запроса. */
+function db_try(): ?PDO
+{
+    try {
+        return db_connect();
+    } catch (RuntimeException $e) {
+        error_log('[db] ' . $e->getMessage());
+        return null;
+    }
+}
+
+/** Создаёт подключение (один раз за запрос). Бросает RuntimeException при сбое. */
+function db_connect(): PDO
 {
     static $pdo = null;
     if ($pdo !== null) {
@@ -21,7 +47,7 @@ function db(): PDO
     $password = (string) ($config['db_password'] ?? '');
 
     if ($name === '' || $user === '' || strpos($name, 'ВАШ') === 0) {
-        api_fail(503, 'Database not configured');
+        throw new RuntimeException('not configured', 1);
     }
 
     $dsn = 'mysql:host=' . $host . ';dbname=' . $name . ';charset=utf8mb4';
@@ -32,9 +58,7 @@ function db(): PDO
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
     } catch (PDOException $e) {
-        // Текст ошибки может содержать реквизиты — наружу его не отдаём.
-        error_log('[db] connection failed: ' . $e->getMessage());
-        api_fail(503, 'Database unavailable');
+        throw new RuntimeException('connection failed: ' . $e->getMessage(), 2);
     }
 
     return $pdo;
