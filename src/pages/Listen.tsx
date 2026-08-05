@@ -213,6 +213,7 @@ export default function Listen() {
             <p className="mx-auto mt-3 max-w-md text-sm text-ink-500 leading-relaxed">
               Нажав на эту кнопку, вы получите полную версию аудио после оплаты.
             </p>
+            <PaymentConsentNote className="mx-auto mt-4 max-w-md" />
           </>
         )}
 
