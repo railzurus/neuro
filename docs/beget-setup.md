@@ -139,15 +139,8 @@ curl -s "https://медитациямечты.рф/api/cron/cleanup.php?token=В
 
 ---
 
-## Когда подключите ЮKassa
+## Оплата через ЮKassa
 
-1. В `secrets.php` выставить `'payments_enabled' => true` и добавить реквизиты
-   магазина (shop_id, secret_key).
-2. В [`api/order-create.php`](../api/order-create.php) — в помеченном
-   `TODO(ЮKassa)` месте создать платёж и вернуть `confirmationUrl`.
-   Фронтенд уже умеет на него уводить.
-3. Добавить `api/yookassa-webhook.php`, который проверяет платёж запросом
-   в API кассы и вызывает `order_mark_paid()` — эта функция уже написана
-   и идемпотентна (повторный вызов не отправит письмо дважды).
-
-Никаких изменений во фронтенде при этом не потребуется.
+Код кассы написан (`api/lib/yookassa.php`, `api/yookassa-webhook.php`,
+`api/cron/reconcile.php`). Что нужно заполнить в кабинете ЮKassa и в
+`secrets.php` — отдельной инструкцией: [`docs/yookassa-setup.md`](yookassa-setup.md).

@@ -12,6 +12,12 @@ const ORDER_PRICE_RUB = 499;
 /** Сколько дней живёт ссылка на заказ. */
 const ORDER_TTL_DAYS = 14;
 
+/**
+ * Наименование услуги: видно в описании платежа и в чеке (54-ФЗ).
+ * Ограничение ЮKassa — 128 символов.
+ */
+const ORDER_ITEM_NAME = 'Персональная аудиозапись «Медитация мечты»';
+
 /** Ограничение на длину истории — защита от мусора в базе. */
 const ORDER_MAX_TEXT_LEN = 20000;
 
@@ -46,6 +52,15 @@ function order_find(string $token): ?array
     }
     $stmt = db()->prepare('SELECT * FROM orders WHERE token = ? LIMIT 1');
     $stmt->execute([$token]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+/** Ищет заказ по идентификатору платежа в ЮKassa. */
+function order_find_by_payment(string $paymentId): ?array
+{
+    $stmt = db()->prepare('SELECT * FROM orders WHERE payment_id = ? LIMIT 1');
+    $stmt->execute([$paymentId]);
     $row = $stmt->fetch();
     return $row ?: null;
 }
@@ -113,6 +128,23 @@ function order_validate_params($raw): array
     }
 
     return ['finalText' => $text, 'voice' => $voice, 'speed' => $speed];
+}
+
+/**
+ * Закрывает неоплаченный заказ. Оплаченный не трогает — на всякий случай,
+ * чтобы гонка уведомлений не отменила выданный заказ.
+ */
+function order_mark_canceled(array $order, ?string $paymentId = null): void
+{
+    try {
+        $stmt = db()->prepare(
+            'UPDATE orders SET status = ?, payment_id = COALESCE(payment_id, ?)
+              WHERE id = ? AND status = ?'
+        );
+        $stmt->execute(['canceled', $paymentId, $order['id'], 'pending']);
+    } catch (PDOException $e) {
+        error_log('[orders] cancel failed: ' . $e->getMessage());
+    }
 }
 
 /**

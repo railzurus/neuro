@@ -21,11 +21,16 @@ import { preloadMusic } from '../lib/audio'
 
 type LoadState = 'loading' | 'ready' | 'notfound' | 'error'
 
+/** Сколько ждём подтверждения оплаты: 40 × 3 с ≈ 2 минуты. */
+const POLL_ATTEMPTS = 40
+const POLL_INTERVAL_MS = 3000
+
 export default function OrderPage() {
   const { token = '' } = useParams()
   const [load, setLoad] = useState<LoadState>('loading')
   const [order, setOrder] = useState<Order | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [waiting, setWaiting] = useState(false)
 
   const [rendering, setRendering] = useState(false)
   const [error, setError] = useState('')
@@ -39,9 +44,14 @@ export default function OrderPage() {
 
   useEffect(() => {
     let cancelled = false
-    setLoad('loading')
-    getOrder(token)
-      .then((found) => {
+    let timer: number | undefined
+    // Возврат из кассы обгоняет её уведомление на несколько секунд,
+    // поэтому неоплаченный заказ переспрашиваем сам — до двух минут.
+    let attempts = 0
+
+    async function load(first: boolean) {
+      try {
+        const found = await getOrder(token)
         if (cancelled) return
         if (!found) {
           setLoad('notfound')
@@ -49,15 +59,31 @@ export default function OrderPage() {
         }
         setOrder(found)
         setLoad('ready')
-      })
-      .catch((e: unknown) => {
+        if (found.status === 'pending' && attempts < POLL_ATTEMPTS) {
+          attempts += 1
+          setWaiting(true)
+          timer = window.setTimeout(() => load(false), POLL_INTERVAL_MS)
+        } else {
+          setWaiting(false)
+        }
+      } catch (e: unknown) {
         if (cancelled) return
+        // Сбой фоновой проверки не должен ломать уже открытую страницу.
+        if (!first) {
+          setWaiting(false)
+          return
+        }
         setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить заказ.')
         setLoad('error')
-      })
+      }
+    }
+
+    setLoad('loading')
+    load(true)
     preloadMusic()
     return () => {
       cancelled = true
+      if (timer) window.clearTimeout(timer)
     }
   }, [token])
 
@@ -143,14 +169,38 @@ export default function OrderPage() {
     )
   }
 
+  if (order.status === 'canceled') {
+    return (
+      <div className="mx-auto max-w-md px-6 py-20 text-center">
+        <h1 className="font-serif text-3xl text-ink-900">Платёж не прошёл</h1>
+        <p className="mt-3 text-ink-500 leading-relaxed">
+          Деньги не списаны. Ваш текст сохранился — можно вернуться и оплатить
+          ещё раз.
+        </p>
+        <Link to="/listen" className="btn-primary mt-7">
+          Вернуться к оплате
+        </Link>
+      </div>
+    )
+  }
+
   if (order.status !== 'paid') {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">
-        <h1 className="font-serif text-3xl text-ink-900">Заказ ожидает оплаты</h1>
+        {waiting && <Loader2 className="mx-auto h-5 w-5 animate-spin text-ink-400" />}
+        <h1 className="mt-4 font-serif text-3xl text-ink-900">
+          {waiting ? 'Подтверждаем оплату' : 'Заказ ожидает оплаты'}
+        </h1>
         <p className="mt-3 text-ink-500 leading-relaxed">
-          Как только платёж подтвердится, запись станет доступна на этой странице.
-          Обновите её через минуту.
+          {waiting
+            ? 'Это занимает несколько секунд. Страница обновится сама — не закрывайте её.'
+            : 'Как только платёж подтвердится, запись станет доступна на этой странице. Ссылка на неё уже сохранена — её же мы пришлём письмом.'}
         </p>
+        {!waiting && (
+          <button onClick={() => window.location.reload()} className="btn-primary mt-7">
+            Проверить ещё раз
+          </button>
+        )}
       </div>
     )
   }
