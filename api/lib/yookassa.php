@@ -134,29 +134,42 @@ function yk_create_payment(string $orderToken, string $email, float $amount, str
 /**
  * Данные чека по 54-ФЗ.
  *
- * Возвращает null, если чеки формирует не наш запрос: онлайн-касса
- * не подключена либо в кабинете выбран сценарий «сначала платёж, потом чек».
- * Управляется ключом yookassa_receipt в config/secrets.php.
+ * У магазина подключены «Чеки от ЮKassa»: касса формирует и отправляет чек
+ * в ФНС и покупателю по данным, которые мы передаём вместе с платежом.
+ * Поэтому receipt — обязательная часть запроса, а не опция.
+ *
+ * Возвращает null только если чеки отключены (yookassa_receipt => false),
+ * например при переходе на стороннюю кассу со сценарием
+ * «сначала платёж, потом чек».
  */
 function yk_receipt(string $email, string $value, string $description): ?array
 {
     $config = api_config();
-    if (empty($config['yookassa_receipt'])) {
+    if (!($config['yookassa_receipt'] ?? true)) {
         return null;
     }
 
-    return [
+    $receipt = [
         'customer' => ['email' => $email],
         'items' => [[
             'description' => mb_substr($description, 0, 128),
             'quantity' => '1.00',
             'amount' => ['value' => $value, 'currency' => 'RUB'],
-            // Ставка НДС: 1 — без НДС (УСН). Сверить с бухгалтером.
+            // Ставка НДС: 1 — без НДС. Сверить с бухгалтером.
             'vat_code' => (int) ($config['yookassa_vat_code'] ?? 1),
             'payment_subject' => (string) ($config['yookassa_payment_subject'] ?? 'service'),
             'payment_mode' => (string) ($config['yookassa_payment_mode'] ?? 'full_prepayment'),
         ]],
     ];
+
+    // Нужен, только если у организации в кассе заведено больше одной
+    // системы налогообложения. Иначе ЮKassa подставит единственную сама.
+    $taxSystem = (int) ($config['yookassa_tax_system_code'] ?? 0);
+    if ($taxSystem > 0) {
+        $receipt['tax_system_code'] = $taxSystem;
+    }
+
+    return $receipt;
 }
 
 /**
