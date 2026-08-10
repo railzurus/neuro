@@ -101,6 +101,25 @@ function yk_request(string $method, string $path, ?array $body = null, ?string $
  */
 function yk_create_payment(string $orderToken, string $email, float $amount, string $returnUrl, string $description): array
 {
+    $payment = yk_payment_body($orderToken, $email, $amount, $returnUrl, $description);
+
+    $res = yk_request('POST', '/payments', $payment, $orderToken);
+
+    if ($res['status'] !== 200 || empty($res['body']['id'])) {
+        $detail = $res['body']['description'] ?? ($res['body']['code'] ?? 'unknown');
+        throw new RuntimeException('YooKassa refused payment (HTTP ' . $res['status'] . '): ' . $detail);
+    }
+
+    return $res['body'];
+}
+
+/**
+ * Тело запроса на создание платежа.
+ * Вынесено отдельно, чтобы api/yookassa-check.php мог отправить ровно тот же
+ * запрос и показать сырой ответ кассы.
+ */
+function yk_payment_body(string $orderToken, string $email, float $amount, string $returnUrl, string $description): array
+{
     $value = number_format($amount, 2, '.', '');
 
     $payment = [
@@ -121,14 +140,7 @@ function yk_create_payment(string $orderToken, string $email, float $amount, str
         $payment['receipt'] = $receipt;
     }
 
-    $res = yk_request('POST', '/payments', $payment, $orderToken);
-
-    if ($res['status'] !== 200 || empty($res['body']['id'])) {
-        $detail = $res['body']['description'] ?? ($res['body']['code'] ?? 'unknown');
-        throw new RuntimeException('YooKassa refused payment (HTTP ' . $res['status'] . '): ' . $detail);
-    }
-
-    return $res['body'];
+    return $payment;
 }
 
 /**
