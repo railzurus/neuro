@@ -1,5 +1,6 @@
 import { Mp3Encoder } from '@breezystack/lamejs'
 import { FEMALE_VOICE_IDS } from '../data/voices'
+import { prepareForTts } from './refine'
 
 /**
  * Audio engine for the dream-life mantra.
@@ -370,6 +371,10 @@ function concatBuffers(ctx: BaseAudioContext, buffers: AudioBuffer[], gapSec: nu
  * Synthesize the whole text into one voice AudioBuffer via the SpeakKit proxy.
  * Returns null on any failure (no key configured, network, decode) so callers
  * can fall back to the browser SpeechSynthesis voice.
+ *
+ * Перед синтезом текст проходит техническую подготовку (`prepareForTts`):
+ * ударения, числа прописью, разбивка на фразы и разметка пауз. Наружу этот
+ * вариант не отдаётся — кэш и вызывающий код работают с текстом пользователя.
  */
 export async function synthesizeVoice(
   text: string,
@@ -387,7 +392,7 @@ export async function synthesizeVoice(
     // far more reliable than spinning up a real AudioContext per synthesis.
     const OAC = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext
     const ctx: BaseAudioContext = new OAC(2, 1, 44100)
-    const chunks = chunkText(text)
+    const chunks = chunkText(await prepareForTts(text))
     if (!chunks.length) return null
     const buffers: AudioBuffer[] = []
     for (const c of chunks) buffers.push(await ttsChunk(ctx, c, voice, speed, orderToken))

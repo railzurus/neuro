@@ -72,6 +72,75 @@ function normalize(input: string): string {
   return t
 }
 
+/* ------------------------------------------------------------------ */
+/*  Техническая подготовка текста к синтезу речи                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Результат подготовки на сессию. Один и тот же текст озвучивается несколько
+ * раз (превью на сайте, сборка заказа, пересборка на странице выдачи), а
+ * каждый вызов GPT платный и небыстрый.
+ */
+const ttsCache = new Map<string, string>()
+
+/** Разметка SpeechKit, которую добавляет технический редактор. */
+const TTS_MARKUP = /sil<\[\d+\]>|<\[accented\]>/g
+
+/**
+ * Доля слов исходника, которую обязан сохранить подготовленный текст.
+ * Страховка от обрыва ответа модели по лимиту токенов: в синтез не должен
+ * уйти текст, у которого отрезало конец.
+ */
+const MIN_KEPT_WORDS = 0.85
+
+/** Считает слова без учёта разметки и знаков ударения. */
+function spokenWordCount(text: string): number {
+  return wordCount(text.replace(TTS_MARKUP, ' ').replace(/\+/g, ''))
+}
+
+/**
+ * Готовит текст к озвучиванию: ё, ударения в омографах, числа прописью,
+ * разбивка на медитативные фразы и разметка пауз sil<[мс]> / акцентов
+ * <[accented]> (поддерживается SpeechKit в API v1 для формата text).
+ *
+ * Вызывается перед отправкой в SpeechKit и НИКОГДА не показывается
+ * пользователю — в интерфейсе и в заказе остаётся его собственный текст.
+ * При любой ошибке возвращает исходный текст: без разметки запись звучит
+ * чуть ровнее, но синтез не ломается.
+ */
+export async function prepareForTts(text: string): Promise<string> {
+  const source = text.trim()
+  if (!source) return text
+
+  const cached = ttsCache.get(source)
+  if (cached !== undefined) return cached
+
+  let prepared = source
+  try {
+    const res = await fetch('/api/refine.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: source, mode: 'tts' }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const candidate = typeof data?.text === 'string' ? data.text.trim() : ''
+      if (candidate && spokenWordCount(candidate) >= spokenWordCount(source) * MIN_KEPT_WORDS) {
+        prepared = candidate
+      } else if (candidate) {
+        console.warn('[prepareForTts] ответ короче исходника — озвучиваем как есть')
+      }
+    }
+  } catch {
+    /* эндпоинта нет или сеть отвалилась — озвучиваем исходный текст */
+  }
+
+  // Неудачу тоже запоминаем: иначе каждое повторное проигрывание снова ждёт
+  // ответа от недоступного эндпоинта.
+  ttsCache.set(source, prepared)
+  return prepared
+}
+
 /** A line already finished by terminal punctuation (possibly inside quotes/brackets). */
 const TERMINATED = /[.!?…]\s*["'»)\]]*$/
 
