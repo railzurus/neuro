@@ -27,12 +27,19 @@ function mail_sender_domain(string $from): string
     return $at === false ? 'localhost' : substr($from, $at + 1);
 }
 
-/** Ссылка на страницу заказа. */
+/**
+ * Ссылка на страницу заказа. Домен берём в punycode: кириллический URL в теле
+ * письма спам-фильтры считают признаком фишинга, а часть почтовых клиентов
+ * ещё и не превращает его в кликабельную ссылку.
+ */
 function mail_order_url(string $token): string
 {
     $config = api_config();
-    $base = rtrim((string) ($config['site_url'] ?? ''), '/');
-    return $base . '/order/' . $token;
+    $base = trim((string) ($config['site_url_ascii'] ?? ''));
+    if ($base === '') {
+        $base = (string) ($config['site_url'] ?? '');
+    }
+    return rtrim($base, '/') . '/order/' . $token;
 }
 
 /**
@@ -58,23 +65,16 @@ function mail_send_order_link(array $order, string $type = 'delivery'): bool
         : 'Ваша запись готова';
 
     $expires = date('d.m.Y', strtotime((string) $order['expires_at']));
+    $created = date('d.m.Y', strtotime((string) ($order['created_at'] ?? 'now')));
 
-    $lines = [
-        'Здравствуйте!',
-        '',
-        'Ваша запись готова. Скачать её можно на этой странице:',
-        $url,
-        '',
-        'Ссылка активна до ' . $expires . '. Скачивать можно сколько угодно раз —',
-        'просто возвращайтесь по ней.',
-        '',
-        'Если письмо пришло вам по ошибке, просто удалите его.',
-        '',
-        '—',
-        $fromName,
-    ];
-    // Кириллица в base64: 8bit-текст фильтры считают признаком спама.
-    $message = chunk_split(base64_encode(implode("\r\n", $lines)), 76, "\r\n");
+    // Письмо из четырёх строк и голой ссылки фильтры принимают за фишинг,
+    // поэтому шлём две части: текстовую и HTML, обе с содержательным текстом.
+    $boundary = 'b' . bin2hex(random_bytes(12));
+    $message = mail_multipart(
+        mail_order_text($url, $fromName, $created, $expires),
+        mail_order_html($url, $fromName, $created, $expires),
+        $boundary
+    );
 
     // Message-ID и Date задаём сами — sendmail проставляет их не всегда,
     // а письмо без них теряет очки у почтовых фильтров.
@@ -86,8 +86,7 @@ function mail_send_order_link(array $order, string $type = 'delivery'): bool
         'Date: ' . date('r'),
         'Message-ID: ' . $messageId,
         'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding: base64',
+        'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
     ]);
 
     $encodedSubject = mail_encode_header($subject);
@@ -101,6 +100,100 @@ function mail_send_order_link(array $order, string $type = 'delivery'): bool
 
     mail_log($order, $type, $sent ? 'sent' : 'failed');
     return (bool) $sent;
+}
+
+/** Собирает multipart/alternative из текстовой и HTML-части. */
+function mail_multipart(string $text, string $html, string $boundary): string
+{
+    $part = function (string $type, string $content): string {
+        return implode("\r\n", [
+            'Content-Type: ' . $type . '; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            rtrim(chunk_split(base64_encode($content), 76, "\r\n")),
+        ]);
+    };
+
+    return implode("\r\n", [
+        '--' . $boundary,
+        $part('text/plain', $text),
+        '--' . $boundary,
+        $part('text/html', $html),
+        '--' . $boundary . '--',
+        '',
+    ]);
+}
+
+/** Домен сайта для показа человеку — кириллицей, в отличие от ссылок. */
+function mail_site_label(): string
+{
+    $config = api_config();
+    $host = parse_url((string) ($config['site_url'] ?? ''), PHP_URL_HOST);
+    return (string) ($host ?: 'медитациямечты.рф');
+}
+
+/** Текстовая часть письма. */
+function mail_order_text(string $url, string $fromName, string $created, string $expires): string
+{
+    return implode("\r\n", [
+        'Здравствуйте!',
+        '',
+        'Вы заказали персональную аудиозапись на сайте ' . mail_site_label() . '.',
+        'Заказ от ' . $created . ' готов — скачать запись можно на этой странице:',
+        '',
+        $url,
+        '',
+        'Ссылка активна до ' . $expires . '. Скачивать можно сколько угодно раз,',
+        'просто возвращайтесь по ней.',
+        '',
+        'Если ссылка не открывается или что-то пошло не так — ответьте на это',
+        'письмо, разберёмся.',
+        '',
+        'Если письмо пришло вам по ошибке, просто удалите его.',
+        '',
+        '—',
+        $fromName,
+        mail_site_label(),
+    ]);
+}
+
+/** HTML-часть письма. Картинок нет намеренно: у нового домена нет репутации. */
+function mail_order_html(string $url, string $fromName, string $created, string $expires): string
+{
+    $e = function (string $value): string {
+        return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    };
+    $site = $e(mail_site_label());
+    $href = $e($url);
+
+    return '<!DOCTYPE html>'
+        . '<html lang="ru"><head><meta charset="UTF-8">'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<title>' . $e($fromName) . '</title></head>'
+        . '<body style="margin:0;padding:24px;background:#f6f5f2;'
+        . 'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;'
+        . 'font-size:16px;line-height:1.6;color:#2b2b2b;">'
+        . '<div style="max-width:520px;margin:0 auto;background:#ffffff;'
+        . 'border-radius:12px;padding:32px;">'
+        . '<p style="margin:0 0 16px;">Здравствуйте!</p>'
+        . '<p style="margin:0 0 16px;">Вы заказали персональную аудиозапись на сайте '
+        . $site . '. Заказ от ' . $e($created) . ' готов.</p>'
+        . '<p style="margin:0 0 24px;"><a href="' . $href . '" '
+        . 'style="display:inline-block;padding:12px 24px;background:#2b2b2b;'
+        . 'color:#ffffff;text-decoration:none;border-radius:8px;">'
+        . 'Скачать запись</a></p>'
+        . '<p style="margin:0 0 16px;">Ссылка активна до ' . $e($expires) . '. '
+        . 'Скачивать можно сколько угодно раз, просто возвращайтесь по ней.</p>'
+        . '<p style="margin:0 0 16px;">Если кнопка не работает, откройте адрес вручную:<br>'
+        . '<a href="' . $href . '" style="color:#6b6b6b;word-break:break-all;">'
+        . $href . '</a></p>'
+        . '<p style="margin:0 0 16px;">Если ссылка не открывается или что-то пошло не так — '
+        . 'ответьте на это письмо, разберёмся.</p>'
+        . '<p style="margin:0 0 24px;color:#6b6b6b;font-size:14px;">'
+        . 'Если письмо пришло вам по ошибке, просто удалите его.</p>'
+        . '<p style="margin:0;color:#6b6b6b;font-size:14px;">'
+        . $e($fromName) . '<br>' . $site . '</p>'
+        . '</div></body></html>';
 }
 
 /**
