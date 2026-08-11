@@ -57,7 +57,10 @@ $text = isset($body['text']) ? trim((string) $body['text']) : '';
 if ($text === '') {
     rfail(400, 'Empty text');
 }
-if (mb_strlen($text) > 8000) {
+// Тот же предел, что и у заказа: в GPT не должно уходить больше, чем мы
+// вообще готовы озвучить (проверяем и здесь — эндпоинт открытый).
+require_once __DIR__ . '/lib/textlimit.php';
+if (!text_within_limit($text)) {
     rfail(413, 'Text too long');
 }
 

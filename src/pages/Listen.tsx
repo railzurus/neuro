@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CreditCard, Loader2, Pause, Play, RotateCcw, Headphones } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { wordCount } from '../lib/refine'
+import { TOTAL_WORD_LIMIT } from '../data/roles'
+import { plural, wordCount } from '../lib/refine'
 import { voiceById } from '../data/voices'
 import { PaymentConsentNote } from '../components/Legal'
 import { PRICE_RUB, createOrder, isValidEmail } from '../lib/orders'
@@ -31,6 +32,7 @@ export default function Listen() {
   const [payError, setPayError] = useState('')
 
   const words = useMemo(() => wordCount(finalText), [finalText])
+  const overLimit = words > TOTAL_WORD_LIMIT
   const seconds = Math.max(Math.round((words / WPM) * 60), 60)
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function Listen() {
   }, [])
 
   function play() {
+    if (overLimit) return
     const session = new MantraSession()
     sessionRef.current = session
     setProgress(0)
@@ -105,6 +108,23 @@ export default function Listen() {
         <p className="text-ink-600">История ещё не готова.</p>
         <Link to="/review" className="btn-primary mt-6">
           Вернуться к истории
+        </Link>
+      </div>
+    )
+  }
+
+  // Ни превью, ни покупки: и синтез, и сборка такого файла в браузере
+  // обходятся слишком дорого, а мантра перестаёт быть мантрой.
+  if (overLimit) {
+    return (
+      <div className="mx-auto max-w-md px-6 py-20 text-center">
+        <p className="text-ink-600 leading-relaxed">
+          В истории {plural(words, 'слово', 'слова', 'слов')} — это дольше{' '}
+          {Math.round(TOTAL_WORD_LIMIT / WPM)} минут. Запись собирается из
+          текста не длиннее {TOTAL_WORD_LIMIT} слов.
+        </p>
+        <Link to="/review" className="btn-primary mt-6">
+          Сократить историю
         </Link>
       </div>
     )

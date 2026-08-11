@@ -98,7 +98,16 @@ export const ROLES: Role[] = [
   },
 ]
 
+/** Слов на одну роль. Пока не уложились — дальше не пускаем. */
 export const WORD_LIMIT = 120
+
+/**
+ * Слов во всей истории: девять ролей по 120. Дольше — это уже не мантра
+ * на 3–5 минут, да и синтез с кодированием такого файла в браузере
+ * становится неподъёмным. Те же числа продублированы на сервере
+ * (api/lib/textlimit.php) — фронтенду верить нельзя.
+ */
+export const TOTAL_WORD_LIMIT = 1200
 
 /** Intro manifesto paragraphs shown on the landing page. */
 export const MANIFESTO: string[] = [

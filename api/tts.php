@@ -63,7 +63,9 @@ if (mb_strlen($text) > 4900) {
 // разметка sil<[мс]> / <[accented]> заметно удлиняют строку, поэтому запас.
 const TTS_ANON_MAX_CHARS = 1000;
 const TTS_ANON_PER_HOUR = 40;
-const TTS_ORDER_PER_DAY = 300;     // подстраховка от злоупотребления самим заказом
+// Одна сборка записи предельной длины — это ~7 кусков, пересобрать заказ можно
+// 10 раз (ORDER_DOWNLOAD_LIMIT), то есть ~70 запросов. Остальное — запас.
+const TTS_ORDER_PER_DAY = 120;
 
 require_once __DIR__ . '/lib/ratelimit.php';
 
@@ -74,6 +76,14 @@ if ($orderToken !== '') {
     $order = order_find($orderToken);
     if (!$order || $order['status'] !== 'paid' || order_is_expired($order)) {
         fail(403, 'Order is not valid for synthesis');
+    }
+    // Оплаченный заказ — не безлимитный пропуск в SpeechKit: кусок не может быть
+    // длиннее собственной истории заказа. Множитель — на разметку и числа
+    // прописью, которые добавляет техническая подготовка (api/refine.php).
+    $params = json_decode((string) ($order['params_json'] ?? ''), true);
+    $ordered = is_array($params) ? (string) ($params['finalText'] ?? '') : '';
+    if ($ordered !== '' && mb_strlen($text) > mb_strlen($ordered) * 2 + 500) {
+        fail(403, 'Text does not match the order');
     }
     if (!rate_limit_allow('tts_order', $orderToken, TTS_ORDER_PER_DAY, 86400)) {
         fail(429, 'Too many requests for this order');

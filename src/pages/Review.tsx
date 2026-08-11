@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, Loader2, Pause, Play, RefreshCw, Wand2 } from 'lucide-react'
 import { useStore, compile } from '../store/useStore'
-import { refineText, wordCount } from '../lib/refine'
+import { TOTAL_WORD_LIMIT } from '../data/roles'
+import { plural, refineText, wordCount } from '../lib/refine'
 import {
   VOICES,
   SPEEDS,
@@ -66,6 +67,8 @@ export default function Review() {
   }, [compiled])
 
   const words = useMemo(() => wordCount(finalText), [finalText])
+  // Длиннее — это уже не мантра на 3–5 минут; тот же предел стоит на сервере.
+  const overLimit = words > TOTAL_WORD_LIMIT
   const seconds = Math.round((words / WPM) * 60)
   const mm = Math.floor(seconds / 60)
   const ss = seconds % 60
@@ -102,12 +105,24 @@ export default function Review() {
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <span className="chip">{words} слов</span>
+        <span className={`chip ${overLimit ? 'text-[#d1567a]' : ''}`}>
+          {words} / {TOTAL_WORD_LIMIT} слов
+        </span>
         <span className="chip">
           ≈ {mm}:{ss.toString().padStart(2, '0')} звучания
         </span>
         <span className="chip">темп {WPM} слов/мин</span>
       </div>
+
+      {overLimit && (
+        <p className="mt-4 rounded-2xl border border-[#e7b3c2] bg-[#fceef2] p-4 text-sm text-[#c0507a]">
+          История длиннее {TOTAL_WORD_LIMIT} слов — это уже больше{' '}
+          {Math.round(TOTAL_WORD_LIMIT / WPM)} минут звучания. Мантру слушают
+          целиком каждый вечер, поэтому уберите примерно{' '}
+          {plural(words - TOTAL_WORD_LIMIT, 'слово', 'слова', 'слов')} — и мы
+          соберём запись.
+        </p>
+      )}
 
       {diverged && (
         <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-brand/30 bg-brand/[0.06] p-4 text-sm text-ink-700 sm:flex-row sm:items-center sm:justify-between">
@@ -135,7 +150,8 @@ export default function Review() {
         </button>
         <button
           onClick={handleRefine}
-          disabled={!finalText.trim() || refining}
+          // Сервер всё равно откажет длинному тексту — не гоняем зря.
+          disabled={!finalText.trim() || refining || overLimit}
           className="btn-outline"
         >
           {refining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
@@ -197,7 +213,7 @@ export default function Review() {
         </button>
         <button
           onClick={() => navigate('/listen')}
-          disabled={!finalText.trim()}
+          disabled={!finalText.trim() || overLimit}
           className="btn-primary"
         >
           Прослушать и скачать

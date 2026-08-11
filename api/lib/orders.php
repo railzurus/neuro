@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/http.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/textlimit.php';
 
 /** Стоимость услуги, ₽ (зафиксирована в Пользовательском соглашении). */
 const ORDER_PRICE_RUB = 499;
@@ -17,9 +18,6 @@ const ORDER_TTL_DAYS = 14;
  * Ограничение ЮKassa — 128 символов.
  */
 const ORDER_ITEM_NAME = 'Персональная аудиозапись «Медитация мечты»';
-
-/** Ограничение на длину истории — защита от мусора в базе. */
-const ORDER_MAX_TEXT_LEN = 20000;
 
 /**
  * Сколько раз можно пересобрать запись по одному заказу.
@@ -115,8 +113,9 @@ function order_validate_params($raw): array
     if ($text === '') {
         api_fail(400, 'Empty text');
     }
-    if (mb_strlen($text) > ORDER_MAX_TEXT_LEN) {
-        api_fail(413, 'Text too long');
+    // Предел общий для всего сервиса, см. lib/textlimit.php.
+    if (!text_within_limit($text)) {
+        api_fail(413, 'Текст длиннее ' . TEXT_WORD_LIMIT . ' слов — сократите историю');
     }
     $voice = (string) ($raw['voice'] ?? '');
     if (!preg_match('/^[a-z_]{1,32}$/', $voice)) {

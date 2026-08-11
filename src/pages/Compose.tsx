@@ -68,14 +68,17 @@ export default function Compose() {
               <button
                 key={r.id}
                 onClick={() => setStep(i)}
-                title={r.title}
+                // Пока текущая роль не уложилась в лимит, уйти с неё нельзя —
+                // иначе полоска прогресса обходила бы заблокированное «Далее».
+                disabled={overLimit && !active}
+                title={overLimit && !active ? `${r.title} — сначала сократите текущую роль` : r.title}
                 className={`h-1.5 flex-1 rounded-full transition-colors ${
                   active
                     ? 'bg-brand'
                     : done
                     ? 'bg-brand/40'
                     : 'bg-black/10 hover:bg-black/20'
-                }`}
+                } ${overLimit && !active ? 'cursor-not-allowed opacity-50' : ''}`}
               />
             )
           })}
@@ -110,7 +113,7 @@ export default function Compose() {
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className={overLimit ? 'text-[#d1567a]' : 'text-ink-400'}>
               {words} / {WORD_LIMIT} слов
-              {overLimit && ' — немного сократите'}
+              {overLimit && ' — сократите, чтобы идти дальше'}
             </span>
             <button
               onClick={handleRefine}
@@ -136,7 +139,7 @@ export default function Compose() {
       <div className="mt-10 flex items-center justify-between">
         <button
           onClick={() => setStep((s) => Math.max(s - 1, 0))}
-          disabled={step === 0}
+          disabled={step === 0 || overLimit}
           className="btn-ghost disabled:opacity-30"
         >
           <ArrowLeft className="h-4 w-4" />

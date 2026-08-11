@@ -167,3 +167,13 @@ export function wordCount(text: string): number {
   if (!trimmed) return 0
   return trimmed.split(/\s+/).length
 }
+
+/** «5 слов», «2 слова», «21 слово» — число вместе с нужной формой. */
+export function plural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n) % 100
+  const last = abs % 10
+  if (abs > 10 && abs < 20) return `${n} ${many}`
+  if (last > 1 && last < 5) return `${n} ${few}`
+  if (last === 1) return `${n} ${one}`
+  return `${n} ${many}`
+}
