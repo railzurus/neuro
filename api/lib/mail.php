@@ -18,6 +18,13 @@ function mail_encode_header(string $value): string
     return '=?UTF-8?B?' . base64_encode($value) . '?=';
 }
 
+/** Домен из адреса отправителя — нужен для Message-ID. */
+function mail_sender_domain(string $from): string
+{
+    $at = strrpos($from, '@');
+    return $at === false ? 'localhost' : substr($from, $at + 1);
+}
+
 /** Ссылка на страницу заказа. */
 function mail_order_url(string $token): string
 {
@@ -64,14 +71,21 @@ function mail_send_order_link(array $order, string $type = 'delivery'): bool
         '—',
         $fromName,
     ];
-    $message = implode("\r\n", $lines);
+    // Кириллица в base64: 8bit-текст фильтры считают признаком спама.
+    $message = chunk_split(base64_encode(implode("\r\n", $lines)), 76, "\r\n");
+
+    // Message-ID и Date задаём сами — sendmail проставляет их не всегда,
+    // а письмо без них теряет очки у почтовых фильтров.
+    $messageId = '<' . bin2hex(random_bytes(16)) . '@' . mail_sender_domain($from) . '>';
 
     $headers = implode("\r\n", [
         'From: ' . mail_encode_header($fromName) . ' <' . $from . '>',
         'Reply-To: ' . $from,
+        'Date: ' . date('r'),
+        'Message-ID: ' . $messageId,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding: 8bit',
+        'Content-Transfer-Encoding: base64',
     ]);
 
     // -f задаёт конверт-отправителя: без него письма чаще уходят в спам.
