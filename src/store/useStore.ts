@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { ROLES } from '../data/roles'
 import { DEFAULT_VOICE, DEFAULT_SPEED } from '../data/voices'
+import { ensureSentenceEnd } from '../lib/refine'
 
 interface State {
   /** roleId -> user's answer text */
@@ -30,9 +31,15 @@ interface State {
   reset: () => void
 }
 
+/**
+ * Join the per-role answers into one story. Each block is closed with a full
+ * stop so the synthesized voice pauses between roles instead of reading them
+ * as one endless sentence.
+ */
 export function compile(answers: Record<string, string>): string {
   return ROLES.map((r) => (answers[r.id] || '').trim())
     .filter(Boolean)
+    .map(ensureSentenceEnd)
     .join('\n\n')
 }
 

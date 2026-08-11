@@ -72,6 +72,27 @@ function normalize(input: string): string {
   return t
 }
 
+/** A line already finished by terminal punctuation (possibly inside quotes/brackets). */
+const TERMINATED = /[.!?…]\s*["'»)\]]*$/
+
+/**
+ * Make sure every non-empty line of a block ends with terminal punctuation.
+ *
+ * The synthesized voice pauses on sentence boundaries, so an answer left
+ * without a final dot would run straight into the next role's text.
+ */
+export function ensureSentenceEnd(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      // Drop trailing separators the user left dangling (", ", " —", ";" …).
+      const t = line.replace(/[\s,;:—–-]+$/, '').trimEnd()
+      if (!t.trim()) return ''
+      return TERMINATED.test(t) ? t : `${t}.`
+    })
+    .join('\n')
+}
+
 export function wordCount(text: string): number {
   const trimmed = text.trim()
   if (!trimmed) return 0

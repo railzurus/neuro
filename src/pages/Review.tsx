@@ -293,7 +293,14 @@ function SpeedChoice({
         {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 translate-x-[1px]" />}
       </button>
       <button onClick={onSelect} className="min-w-0 flex-1 text-left">
-        <span className="block font-medium text-ink-900">{s.label}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-medium text-ink-900">{s.label}</span>
+          {s.recommended && (
+            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand">
+              рекомендуем
+            </span>
+          )}
+        </span>
         <span className="block text-xs text-ink-400">{s.hint}</span>
       </button>
       {active ? (
