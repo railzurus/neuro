@@ -43,6 +43,16 @@ function mail_order_url(string $token): string
 }
 
 /**
+ * Ссылка для отказа от писем. Рассылок мы не ведём, письма только по заказу,
+ * поэтому отписка сделана письмом на наш ящик — отдельная страница для этого
+ * не нужна. Наличие такой ссылки требует Beget как условие отправки по SMTP.
+ */
+function mail_unsubscribe_url(string $from): string
+{
+    return 'mailto:' . $from . '?subject=' . rawurlencode('Отписаться от писем');
+}
+
+/**
  * Отправляет письмо со ссылкой на заказ.
  * $type: 'delivery' (первое письмо) или 'resend' (повторное).
  * Возвращает true при успехе.
@@ -70,9 +80,10 @@ function mail_send_order_link(array $order, string $type = 'delivery'): bool
     // Письмо из четырёх строк и голой ссылки фильтры принимают за фишинг,
     // поэтому шлём две части: текстовую и HTML, обе с содержательным текстом.
     $boundary = 'b' . bin2hex(random_bytes(12));
+    $unsubscribe = mail_unsubscribe_url($from);
     $message = mail_multipart(
-        mail_order_text($url, $fromName, $created, $expires),
-        mail_order_html($url, $fromName, $created, $expires),
+        mail_order_text($url, $fromName, $created, $expires, $unsubscribe),
+        mail_order_html($url, $fromName, $created, $expires, $unsubscribe),
         $boundary
     );
 
@@ -85,6 +96,7 @@ function mail_send_order_link(array $order, string $type = 'delivery'): bool
         'Reply-To: ' . $from,
         'Date: ' . date('r'),
         'Message-ID: ' . $messageId,
+        'List-Unsubscribe: <' . $unsubscribe . '>',
         'MIME-Version: 1.0',
         'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
     ]);
@@ -133,7 +145,7 @@ function mail_site_label(): string
 }
 
 /** Текстовая часть письма. */
-function mail_order_text(string $url, string $fromName, string $created, string $expires): string
+function mail_order_text(string $url, string $fromName, string $created, string $expires, string $unsubscribe): string
 {
     return implode("\r\n", [
         'Здравствуйте!',
@@ -149,16 +161,18 @@ function mail_order_text(string $url, string $fromName, string $created, string 
         'Если ссылка не открывается или что-то пошло не так — ответьте на это',
         'письмо, разберёмся.',
         '',
-        'Если письмо пришло вам по ошибке, просто удалите его.',
-        '',
         '—',
         $fromName,
         mail_site_label(),
+        '',
+        'Это письмо о вашем заказе, рассылок мы не ведём. Если вы больше не',
+        'хотите получать от нас письма, откажитесь по ссылке:',
+        $unsubscribe,
     ]);
 }
 
 /** HTML-часть письма. Картинок нет намеренно: у нового домена нет репутации. */
-function mail_order_html(string $url, string $fromName, string $created, string $expires): string
+function mail_order_html(string $url, string $fromName, string $created, string $expires, string $unsubscribe): string
 {
     $e = function (string $value): string {
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -187,12 +201,15 @@ function mail_order_html(string $url, string $fromName, string $created, string 
         . '<p style="margin:0 0 16px;">Если кнопка не работает, откройте адрес вручную:<br>'
         . '<a href="' . $href . '" style="color:#6b6b6b;word-break:break-all;">'
         . $href . '</a></p>'
-        . '<p style="margin:0 0 16px;">Если ссылка не открывается или что-то пошло не так — '
+        . '<p style="margin:0 0 24px;">Если ссылка не открывается или что-то пошло не так — '
         . 'ответьте на это письмо, разберёмся.</p>'
         . '<p style="margin:0 0 24px;color:#6b6b6b;font-size:14px;">'
-        . 'Если письмо пришло вам по ошибке, просто удалите его.</p>'
-        . '<p style="margin:0;color:#6b6b6b;font-size:14px;">'
         . $e($fromName) . '<br>' . $site . '</p>'
+        . '<p style="margin:0;padding-top:16px;border-top:1px solid #e6e4e0;'
+        . 'color:#8a8a8a;font-size:13px;line-height:1.5;">'
+        . 'Это письмо о вашем заказе, рассылок мы не ведём. Если вы больше не хотите '
+        . 'получать от нас письма, <a href="' . $e($unsubscribe) . '" '
+        . 'style="color:#8a8a8a;">откажитесь здесь</a>.</p>'
         . '</div></body></html>';
 }
 
