@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import CookieNotice from './components/CookieNotice'
 
@@ -96,6 +96,13 @@ export default function App() {
       </footer>
 
       <CookieNotice />
+
+      {/*
+        Без этого переход по ссылке сохраняет позицию скролла с прошлой
+        страницы, и пользователь попадает в середину новой. Уводит наверх на
+        новых переходах и возвращает прежнее место при «назад»/«вперёд».
+      */}
+      <ScrollRestoration />
     </div>
   )
 }
