@@ -105,9 +105,9 @@ export default function Listen() {
   if (!finalText.trim()) {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">
-        <p className="text-ink-600">История ещё не готова.</p>
+        <p className="text-ink-600">Текст ещё не готов.</p>
         <Link to="/review" className="btn-primary mt-6">
-          Вернуться к истории
+          Вернуться к тексту
         </Link>
       </div>
     )
@@ -119,12 +119,12 @@ export default function Listen() {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">
         <p className="text-ink-600 leading-relaxed">
-          В истории {plural(words, 'слово', 'слова', 'слов')} — это дольше{' '}
+          В тексте {plural(words, 'слово', 'слова', 'слов')} — это дольше{' '}
           {Math.round(TOTAL_WORD_LIMIT / WPM)} минут. Запись собирается из
           текста не длиннее {TOTAL_WORD_LIMIT} слов.
         </p>
         <Link to="/review" className="btn-primary mt-6">
-          Сократить историю
+          Сократить текст
         </Link>
       </div>
     )
@@ -146,7 +146,7 @@ export default function Listen() {
       <h1 className="font-serif text-4xl text-ink-900">Ваша мантра готова</h1>
       <p className="mx-auto mt-2 max-w-md text-ink-600 leading-relaxed">
         Голос <span className="text-ink-900">{voiceById(voice).label}</span> читает
-        вашу историю в медленном темпе на фоне альфа-волн. Здесь звучит короткое
+        ваш текст в медленном темпе на фоне альфа-волн. Здесь звучит короткое
         превью (~15 секунд) — полная запись доступна при скачивании.
       </p>
 

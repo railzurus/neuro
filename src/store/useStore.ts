@@ -4,7 +4,16 @@ import { ROLES } from '../data/roles'
 import { DEFAULT_VOICE, DEFAULT_SPEED } from '../data/voices'
 import { ensureSentenceEnd } from '../lib/refine'
 
+/**
+ * How the user is writing the text: by answering the nine role questions,
+ * or by typing/pasting their own. The nine roles are one way to arrive at a
+ * text, not the service itself.
+ */
+export type ComposeMode = 'roles' | 'own'
+
 interface State {
+  mode: ComposeMode
+  setMode: (m: ComposeMode) => void
   /** roleId -> user's answer text */
   answers: Record<string, string>
   /** Compiled + possibly hand-edited final story used for narration */
@@ -46,6 +55,10 @@ export function compile(answers: Record<string, string>): string {
 export const useStore = create<State>()(
   persist(
     (set, get) => ({
+      // 'roles' по умолчанию: у тех, кто начал до появления второго пути,
+      // в сохранённом состоянии этого поля нет, и они должны остаться в ролях.
+      mode: 'roles',
+      setMode: (m) => set({ mode: m }),
       answers: {},
       finalText: '',
       finalSnapshot: '',
@@ -63,6 +76,7 @@ export const useStore = create<State>()(
       compileStory: () => compile(get().answers),
       reset: () =>
         set({
+          mode: 'roles',
           answers: {},
           finalText: '',
           finalSnapshot: '',

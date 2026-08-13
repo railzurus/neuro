@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, Loader2, Pause, Play, RefreshCw, Wand2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ListChecks, Loader2, Pause, Play, RefreshCw, Trash2, Wand2 } from 'lucide-react'
 import { useStore, compile } from '../store/useStore'
 import { TOTAL_WORD_LIMIT } from '../data/roles'
 import { plural, refineText, wordCount } from '../lib/refine'
@@ -17,6 +17,8 @@ const WPM = 85
 
 export default function Review() {
   const navigate = useNavigate()
+  const mode = useStore((s) => s.mode)
+  const setMode = useStore((s) => s.setMode)
   const answers = useStore((s) => s.answers)
   const finalText = useStore((s) => s.finalText)
   const finalSnapshot = useStore((s) => s.finalSnapshot)
@@ -53,18 +55,22 @@ export default function Review() {
     el.play().then(() => setPreviewing(key)).catch(() => setPreviewing(null))
   }
 
+  // Свой текст живёт сам по себе: ответы на роли к нему отношения не имеют,
+  // поэтому вся сборка из ответов включается только в режиме ролей.
+  const fromRoles = mode === 'roles'
   const compiled = compile(answers)
   const hasAnswers = compiled.trim() !== ''
   // The user hand-edited the story and answers no longer match it.
-  const diverged = finalText.trim() !== '' && finalText !== compiled
+  const diverged = fromRoles && finalText.trim() !== '' && finalText !== compiled
 
   // Keep the story in sync with the answers unless the user edited it by hand.
   useEffect(() => {
+    if (!fromRoles) return
     if (!finalText.trim() || finalText === finalSnapshot) {
       syncFinalFromAnswers()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compiled])
+  }, [compiled, fromRoles])
 
   const words = useMemo(() => wordCount(finalText), [finalText])
   // Длиннее — это уже не мантра на 3–5 минут; тот же предел стоит на сервере.
@@ -83,7 +89,7 @@ export default function Review() {
     }
   }
 
-  if (!hasAnswers) {
+  if (fromRoles && !hasAnswers) {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">
         <p className="text-ink-600">
@@ -98,10 +104,13 @@ export default function Review() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 pb-24">
-      <h1 className="font-serif text-4xl text-ink-900">Ваша история</h1>
+      <h1 className="font-serif text-4xl text-ink-900">
+        {fromRoles ? 'Ваша история' : 'Ваш текст'}
+      </h1>
       <p className="mt-2 text-ink-600 leading-relaxed">
-        Вот образ жизни вашей мечты, собранный из ваших ответов. Перечитайте его
-        вслух и доведите до идеала — каждое слово должно откликаться.
+        {fromRoles
+          ? 'Вот образ жизни вашей мечты, собранный из ваших ответов. Перечитайте его вслух и доведите до идеала — каждое слово должно откликаться.'
+          : 'Напишите или вставьте текст, который будет звучать в записи. Перечитайте его вслух — каждое слово должно откликаться.'}
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -140,14 +149,30 @@ export default function Review() {
       <textarea
         value={finalText}
         onChange={(e) => setFinalText(e.target.value)}
+        placeholder={
+          fromRoles
+            ? undefined
+            : 'Пишите от первого лица, в настоящем времени, как будто это уже происходит. Или вставьте готовый текст — аффирмации, молитву, свои слова…'
+        }
         rows={16}
-        className="mt-4 w-full resize-none rounded-2xl border border-black/[0.07] bg-white p-5 font-serif text-lg leading-relaxed text-ink-900 shadow-soft focus:border-brand/60"
+        className="mt-4 w-full resize-none rounded-2xl border border-black/[0.07] bg-white p-5 font-serif text-lg leading-relaxed text-ink-900 placeholder:font-sans placeholder:text-base placeholder:text-ink-300 shadow-soft focus:border-brand/60"
       />
       <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-        <button onClick={syncFinalFromAnswers} className="btn-outline">
-          <RefreshCw className="h-4 w-4" />
-          Собрать из ответов
-        </button>
+        {fromRoles ? (
+          <button onClick={syncFinalFromAnswers} className="btn-outline">
+            <RefreshCw className="h-4 w-4" />
+            Собрать из ответов
+          </button>
+        ) : (
+          <button
+            onClick={() => setFinalText('')}
+            disabled={!finalText.trim()}
+            className="btn-outline disabled:opacity-30"
+          >
+            <Trash2 className="h-4 w-4" />
+            Очистить
+          </button>
+        )}
         <button
           onClick={handleRefine}
           // Сервер всё равно откажет длинному тексту — не гоняем зря.
@@ -206,11 +231,25 @@ export default function Review() {
       ))}
 
       {/* Nav */}
-      <div className="mt-12 flex items-center justify-between">
-        <button onClick={() => navigate('/compose')} className="btn-ghost">
-          <ArrowLeft className="h-4 w-4" />
-          К ролям
-        </button>
+      <div className="mt-12 flex items-center justify-between gap-3">
+        {fromRoles ? (
+          <button onClick={() => navigate('/compose')} className="btn-ghost">
+            <ArrowLeft className="h-4 w-4" />
+            К ролям
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setMode('roles')
+              navigate('/compose')
+            }}
+            title="Ответите на девять вопросов, и текст соберётся из ответов"
+            className="btn-ghost"
+          >
+            <ListChecks className="h-4 w-4" />
+            Помогите написать
+          </button>
+        )}
         <button
           onClick={() => navigate('/listen')}
           disabled={!finalText.trim() || overLimit}

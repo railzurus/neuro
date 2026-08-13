@@ -10,6 +10,13 @@ export default function Compose() {
   const navigate = useNavigate()
   const answers = useStore((s) => s.answers)
   const setAnswer = useStore((s) => s.setAnswer)
+  const setMode = useStore((s) => s.setMode)
+
+  // Заход сюда — сам по себе выбор пути «помогите написать», даже если
+  // пользователь пришёл по прямой ссылке мимо главной.
+  useEffect(() => {
+    setMode('roles')
+  }, [setMode])
 
   const [step, setStep] = useState(() => {
     // Resume at the first unanswered role.
