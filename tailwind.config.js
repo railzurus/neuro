@@ -8,7 +8,7 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
-        canvas: '#f1f6f5',
+        canvas: '#f9fbfa',
         surface: '#ffffff',
         ink: {
           900: '#241f38',
