@@ -70,6 +70,17 @@ $mode = (($body['mode'] ?? 'affirmation') === 'tts') ? 'tts' : 'affirmation';
 // иначе им можно пользоваться как бесплатным GPT за наш счёт. Технический режим
 // вызывается автоматически перед каждым синтезом, поэтому лимит у него выше.
 require_once __DIR__ . '/lib/ratelimit.php';
+
+// Потолок на весь сайт поверх персонального: у нарушителя с набором прокси
+// адреса честно разные, и лимит по IP его не держит. Число подобрано с
+// запасом относительно нынешней посещаемости — если живые пользователи
+// начнут в него упираться, это попадёт в лог ошибок PHP, и предел надо
+// будет поднять.
+const REFINE_TOTAL_PER_HOUR = 300;
+if (!rate_limit_total_allow('refine_' . $mode, REFINE_TOTAL_PER_HOUR, 3600)) {
+    rfail(429, 'Service is busy, try later');
+}
+
 $quota = $mode === 'tts' ? 40 : 20;
 if (!rate_limit_allow('refine_' . $mode, api_client_ip(), $quota, 3600)) {
     rfail(429, 'Too many requests, try later');

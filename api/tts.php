@@ -63,6 +63,10 @@ if (mb_strlen($text) > 4900) {
 // разметка sil<[мс]> / <[accented]> заметно удлиняют строку, поэтому запас.
 const TTS_ANON_MAX_CHARS = 1000;
 const TTS_ANON_PER_HOUR = 40;
+// Потолок на весь сайт поверх персонального: у нарушителя с набором прокси
+// адреса честно разные, и лимит по IP его не держит. Если в него начнут
+// упираться живые пользователи, это попадёт в лог ошибок PHP.
+const TTS_ANON_TOTAL_PER_HOUR = 600;
 // Одна сборка записи предельной длины — это ~7 кусков, пересобрать заказ можно
 // 10 раз (ORDER_DOWNLOAD_LIMIT), то есть ~70 запросов. Остальное — запас.
 const TTS_ORDER_PER_DAY = 120;
@@ -91,6 +95,9 @@ if ($orderToken !== '') {
 } else {
     if (mb_strlen($text) > TTS_ANON_MAX_CHARS) {
         fail(403, 'Full synthesis requires a paid order');
+    }
+    if (!rate_limit_total_allow('tts_anon', TTS_ANON_TOTAL_PER_HOUR, 3600)) {
+        fail(429, 'Service is busy, try later');
     }
     if (!rate_limit_allow('tts_anon', api_client_ip(), TTS_ANON_PER_HOUR, 3600)) {
         fail(429, 'Too many requests, try later');

@@ -72,14 +72,48 @@ function api_valid_email(string $email): bool
     return (bool) filter_var($email, FILTER_VALIDATE_EMAIL);
 }
 
-/** IP клиента (Beget проксирует, поэтому смотрим и заголовки). */
+/** Приватный, локальный или просто невалидный адрес — то есть не публичный. */
+function api_ip_is_local(string $ip): bool
+{
+    return filter_var(
+        $ip,
+        FILTER_VALIDATE_IP,
+        FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+    ) === false;
+}
+
+/**
+ * IP клиента. Используется как ключ ограничения частоты обращений к платным
+ * API, поэтому подделка ключа = обход лимита.
+ *
+ * Заголовкам X-Real-IP и X-Forwarded-For верим только если запрос пришёл от
+ * локального прокси (Beget проксирует, и REMOTE_ADDR тогда его собственный).
+ * Если REMOTE_ADDR публичный — значит запрос пришёл к нам напрямую, и любые
+ * заголовки в нём выставил сам клиент: раньше мы читали их первыми, и скрипт
+ * со случайным X-Real-IP в каждом запросе обнулял счётчик на каждом вызове.
+ *
+ * Из X-Forwarded-For берём последний элемент, а не первый: цепочка идёт от
+ * клиента к нам, начало подставляет клиент, конец — наш собственный прокси.
+ */
 function api_client_ip(): string
 {
-    foreach (['HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $key) {
-        if (!empty($_SERVER[$key])) {
-            $value = explode(',', (string) $_SERVER[$key])[0];
-            return substr(trim($value), 0, 45);
+    $remote = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+
+    if ($remote !== '' && !api_ip_is_local($remote)) {
+        return substr($remote, 0, 45);
+    }
+
+    if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+        return substr(trim((string) $_SERVER['HTTP_X_REAL_IP']), 0, 45);
+    }
+
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $parts = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']);
+        $last = trim((string) end($parts));
+        if ($last !== '') {
+            return substr($last, 0, 45);
         }
     }
-    return '';
+
+    return substr($remote, 0, 45);
 }
