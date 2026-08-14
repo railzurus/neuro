@@ -114,7 +114,10 @@ export default function Compose() {
             placeholder="Пишите от первого лица, в настоящем времени, как будто это уже происходит…"
             rows={7}
             className={`w-full resize-none rounded-2xl border bg-white p-5 text-[15px] leading-relaxed text-ink-900 placeholder:text-ink-300 shadow-soft transition-colors focus:border-brand/60 ${
-              overLimit ? 'border-blob-blush' : 'border-black/[0.07]'
+              // Тот же розовый, что и у прочих предупреждений: раньше здесь
+              // был blob-blush, но после перехода на бирюзу этот оттенок стал
+              // фоновым голубым и перестал читаться как ошибка.
+              overLimit ? 'border-[#e7b3c2]' : 'border-black/[0.07]'
             }`}
           />
           <div className="mt-2 flex items-center justify-between text-sm">

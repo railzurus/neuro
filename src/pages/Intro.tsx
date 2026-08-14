@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, ListChecks, Moon, PenLine, Sparkles } from 'lucide-react'
+import { ArrowRight, Headphones, ListChecks, PenLine, Sparkles } from 'lucide-react'
 import { RITUAL, ROLES, TOTAL_WORD_LIMIT } from '../data/roles'
 import { SPEEDS, VOICES } from '../data/voices'
 import { RoleIconTile } from '../components/RoleIcon'
@@ -21,21 +21,25 @@ export default function Intro() {
       <section className="relative pt-10 pb-16 text-center">
         <div className="pointer-events-none absolute left-1/2 top-6 -z-10 h-56 w-56 -translate-x-1/2 rounded-full bg-blob-clay/70 blur-3xl animate-breathe" />
         <span className="mb-5 inline-grid h-14 w-14 place-items-center rounded-full bg-white shadow-soft border border-black/5">
-          <Moon className="h-7 w-7 text-brand" />
+          <Headphones className="h-7 w-7 text-brand" />
         </span>
-        <h1 className="font-serif text-5xl sm:text-6xl leading-[1.05] text-ink-900 animate-fadeup">
-          Прояви жизнь
+        {/*
+          Кегль меньше прежнего заголовка: фраза длиннее. На 36px строка
+          «идеальную медитацию» упиралась в край колонки на мобильных,
+          поэтому там 32px.
+        */}
+        <h1 className="font-serif text-[2rem] sm:text-5xl leading-[1.1] text-ink-900 animate-fadeup">
+          Создайте свою
           <br />
-          <span className="bg-gradient-to-r from-brand to-[#e0a05f] bg-clip-text text-transparent">
-            своей мечты
+          <span className="bg-gradient-to-r from-brand to-[#4cc0b2] bg-clip-text text-transparent">
+            идеальную медитацию
           </span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-ink-600 leading-relaxed">
-          Создайте свою идеальную медитацию. Мечтаете о жизни, где всё
-          складывается легко и гармонично? Превратите свои представления о
-          счастье и гармонии в персональную медитацию — она станет вашим
-          проводником, мягко направляя к мечте и помогая обрести внутреннюю
-          гармонию.
+          Мечтаете о жизни, где всё складывается легко и гармонично? Превратите
+          свои представления о счастье и гармонии в персональную медитацию — она
+          станет вашим проводником, мягко направляя к мечте и помогая обрести
+          внутреннюю гармонию.
         </p>
 
         {/* Два пути к тексту */}

@@ -8,7 +8,7 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
-        canvas: '#f6f3f1',
+        canvas: '#f1f6f5',
         surface: '#ffffff',
         ink: {
           900: '#241f38',
@@ -18,23 +18,27 @@ export default {
           400: '#9a95ab',
           300: '#bdb8c9',
         },
+        // Бирюза берётся глубокая, а не светлая: на кнопках по ней идёт белый
+        // текст. #0f8480 даёт контраст 4.53 — выше порога WCAG AA (4.5) и чуть
+        // лучше, чем было у прежнего кораллового (4.38). Светлая бирюза живёт
+        // в blob-оттенках ниже: там она только фон и свечение.
         brand: {
-          DEFAULT: '#c05b3a',
-          600: '#a4482c',
-          50: '#f8ece6',
+          DEFAULT: '#0f8480',
+          600: '#0b6a67',
+          50: '#e3f2f1',
         },
         gold: '#cf9445',
         blob: {
-          clay: '#f0cbb5',
-          blush: '#f6cdd8',
-          peach: '#f7dcc3',
-          rose: '#eec2b6',
+          clay: '#bde4de',
+          blush: '#cfe6ef',
+          peach: '#d8efe6',
+          rose: '#aedbd8',
         },
       },
       boxShadow: {
-        card: '0 14px 44px -20px rgba(120,70,50,0.28), 0 2px 8px -4px rgba(120,70,50,0.10)',
-        soft: '0 8px 24px -12px rgba(120,70,50,0.20)',
-        glow: '0 12px 34px -10px rgba(192,91,58,0.55)',
+        card: '0 14px 44px -20px rgba(24,80,78,0.26), 0 2px 8px -4px rgba(24,80,78,0.10)',
+        soft: '0 8px 24px -12px rgba(24,80,78,0.20)',
+        glow: '0 12px 34px -10px rgba(15,132,128,0.45)',
       },
       keyframes: {
         breathe: {
