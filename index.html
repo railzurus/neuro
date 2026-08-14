@@ -4,6 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Медитация мечты</title>
+    <meta
+      name="description"
+      content="Превращаем ваш текст в аудио-медитацию: спокойный голос читает его в медленном темпе на фоне альфа-волн. Вставьте свой текст или составьте его по девяти вопросам."
+    />
+
+    <!--
+      Ссылки canonical и og:url намеренно отсутствуют. Все маршруты отдаются
+      одним и тем же index.html (SPA-фолбэк в .htaccess), поэтому жёстко
+      прописанный адрес объявил бы главной страницей и /privacy, и /terms —
+      поисковик выкинул бы их из индекса как дубли.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Медитация мечты" />
+    <meta property="og:title" content="Медитация мечты" />
+    <meta
+      property="og:description"
+      content="Превращаем ваш текст в аудио-медитацию: спокойный голос читает его в медленном темпе на фоне альфа-волн."
+    />
+    <meta property="og:locale" content="ru_RU" />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

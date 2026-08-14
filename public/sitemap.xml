@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Карта сайта. Адреса в punycode: в XML домен должен быть в ASCII.
+
+  Здесь только страницы с самостоятельным содержанием. Шаги создания записи
+  (/compose, /review, /listen) не включены — это состояния одного процесса,
+  без пройденных шагов они пустые. Страницы заказов /order/<токен> приватные
+  и закрыты в robots.txt.
+
+  Файл ведётся руками: при добавлении новой страницы допишите её сюда.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://xn--80ahccnbxf5ce4bp7cvc.xn--p1ai/</loc>
+  </url>
+  <url>
+    <loc>https://xn--80ahccnbxf5ce4bp7cvc.xn--p1ai/privacy</loc>
+  </url>
+  <url>
+    <loc>https://xn--80ahccnbxf5ce4bp7cvc.xn--p1ai/terms</loc>
+  </url>
+  <url>
+    <loc>https://xn--80ahccnbxf5ce4bp7cvc.xn--p1ai/consent</loc>
+  </url>
+</urlset>
