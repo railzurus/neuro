@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom'
-import { Mail } from 'lucide-react'
+import { Home, Mail } from 'lucide-react'
 import CookieNotice from './components/CookieNotice'
 
 const YM_COUNTER_ID = 111091612
@@ -32,7 +32,7 @@ export default function App() {
         <div className="relative mx-auto flex max-w-5xl items-center justify-center px-6 py-5">
           <Link to="/" className="group">
             <span className="font-serif text-lg tracking-wide text-ink-900 group-hover:text-brand transition-colors">
-              Жизнь мечты
+              Медитация мечты
             </span>
           </Link>
           {!isHome && (
@@ -40,7 +40,13 @@ export default function App() {
               to="/"
               className="absolute right-6 top-1/2 -translate-y-1/2 text-sm text-ink-500 hover:text-ink-900 transition-colors"
             >
-              На главную
+              {/*
+                На узких экранах только иконка: с названием «Медитация мечты»
+                текстовая ссылка наезжала на него на ширине 320 px.
+              */}
+              <span className="hidden sm:inline">На главную</span>
+              <Home className="h-4 w-4 sm:hidden" aria-hidden="true" />
+              <span className="sr-only sm:hidden">На главную</span>
             </Link>
           )}
         </div>

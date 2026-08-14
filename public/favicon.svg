@@ -2,8 +2,16 @@
   <!--
     Фирменный круг + залитый силуэт луны. Контурная иконка на 16 px
     расплывается, поэтому здесь силуэт, а не штрих.
+    Градиент тот же, что у кнопок и шара на странице прослушивания
+    (см. .btn-primary в src/index.css).
   -->
-  <circle cx="16" cy="16" r="16" fill="#0f8480"/>
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f8480"/>
+      <stop offset="1" stop-color="#35b3a5"/>
+    </linearGradient>
+  </defs>
+  <circle cx="16" cy="16" r="16" fill="url(#brand)"/>
   <!-- scale(1.15) — чтобы силуэт занимал ~65% круга и читался на 16 px -->
   <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" fill="#fff" transform="translate(2.2 2.2) scale(1.15)"/>
 </svg>
