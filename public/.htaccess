@@ -13,6 +13,17 @@ DirectoryIndex index.html
   RewriteEngine On
   RewriteBase /
   RewriteRule ^(index|app)\.html$ - [L]
+
+  # Предрендеренные страницы лежат рядом файлами: /privacy → /privacy.html
+  # (см. scripts/prerender.mjs). Файлом, а не каталогом с index.html внутри:
+  # иначе Apache редиректил бы /privacy на /privacy/, а в карте сайта адрес
+  # без слэша. Условие -f проверяет наличие файла, поэтому маршруты без
+  # предрендера сюда не попадают и уходят на фолбэк ниже.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+  RewriteRule ^(.+?)/?$ /$1.html [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /app.html [L]

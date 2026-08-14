@@ -4,6 +4,22 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import { routes } from './routes'
 
+/*
+  Предрендеренные страницы Apache отдаёт файлами: /privacy → /privacy.html
+  (см. public/.htaccess). Обычно подмена внутренняя, и в адресной строке
+  остаётся чистый /privacy. Но если открыть адрес с расширением напрямую,
+  маршрут не найдётся и страница окажется пустой — приводим адрес к чистому
+  виду до создания роутера.
+*/
+if (window.location.pathname.endsWith('.html')) {
+  const { pathname, search, hash } = window.location
+  const clean =
+    pathname === '/index.html' || pathname === '/app.html'
+      ? '/'
+      : pathname.slice(0, -'.html'.length)
+  window.history.replaceState(null, '', clean + search + hash)
+}
+
 const router = createBrowserRouter(routes)
 
 /*
