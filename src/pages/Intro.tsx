@@ -51,7 +51,6 @@ export default function Intro() {
             title="На основе вашего текста"
             body="Вставьте готовый — аффирмации, молитву, свои слова. Выберете голос и темп."
             cta="Вставить текст"
-            primary
           />
           <PathCard
             onClick={scrollToMethod}
@@ -59,6 +58,7 @@ export default function Intro() {
             title="Поможем описать образ"
             body="Проведём по девяти вопросам о жизни вашей мечты — из ответов соберётся текст."
             cta="Как это устроено"
+            primary
           />
         </div>
         <StartConsentNote className="mx-auto mt-5 max-w-md text-center" />
@@ -204,12 +204,12 @@ export default function Intro() {
             вечеров — и Вселенная позаботится об остальном.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/review" onClick={() => setMode('own')} className="btn-primary">
+            <Link to="/review" onClick={() => setMode('own')} className="btn-outline">
               На основе вашего текста
-              <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link to="/compose" onClick={() => setMode('roles')} className="btn-outline">
+            <Link to="/compose" onClick={() => setMode('roles')} className="btn-primary">
               Поможем описать образ
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <StartConsentNote className="mx-auto mt-4 max-w-md" />
