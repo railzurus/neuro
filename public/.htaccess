@@ -1,16 +1,21 @@
 # Наш index.html всегда приоритетнее дефолтного index.php Beget
 DirectoryIndex index.html
 
-# SPA-фолбэк: все несуществующие пути отдаём index.html,
-# чтобы React Router обрабатывал маршруты (/compose, /review, /listen)
-# и обновление страницы по прямой ссылке не давало 404.
+# SPA-фолбэк: все несуществующие пути отдаём app.html, чтобы React Router
+# обрабатывал маршруты (/compose, /review, /listen) и обновление страницы
+# по прямой ссылке не давало 404.
+#
+# Именно app.html, а не index.html: в index.html при сборке вставляется
+# предрендеренная главная (scripts/prerender.mjs). Отдавай мы его на все
+# маршруты — человек, открывший ссылку на заказ из письма, сначала увидел бы
+# главную страницу и только потом свой заказ. В app.html корень пустой.
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-  RewriteRule ^index\.html$ - [L]
+  RewriteRule ^(index|app)\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  RewriteRule . /app.html [L]
 </IfModule>
 
 # Кэширование статики (хэшированные ассеты Vite можно держать долго)
@@ -24,7 +29,7 @@ DirectoryIndex index.html
 
 # index.html не кэшируем, чтобы новые сборки подхватывались сразу
 <IfModule mod_headers.c>
-  <FilesMatch "index\.html$">
+  <FilesMatch "^(index|app)\.html$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 </IfModule>

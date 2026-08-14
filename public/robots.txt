@@ -13,4 +13,8 @@ Disallow: /order/
 # API — служебные эндпоинты, страниц для людей под ними нет.
 Disallow: /api/
 
+# Пустой шаблон приложения: он отдаётся под остальными маршрутами,
+# но сам по себе содержания не имеет (см. scripts/prerender.mjs).
+Disallow: /app.html
+
 Sitemap: https://xn--80ahccnbxf5ce4bp7cvc.xn--p1ai/sitemap.xml
