@@ -164,7 +164,7 @@ export default function Intro() {
         </div>
         <blockquote className="mt-6 rounded-2xl border border-black/[0.06] bg-white/60 p-6 font-serif text-xl italic text-ink-700">
           «Благодари Бога за то, что у тебя есть, и он даст тебе неизмеримо
-          больше» 😊
+          больше»
         </blockquote>
 
         {/* Roles preview */}
