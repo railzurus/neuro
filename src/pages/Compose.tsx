@@ -33,7 +33,12 @@ export default function Compose() {
   const completedCount = ROLES.filter((r) => (answers[r.id] || '').trim()).length
 
   useEffect(() => {
-    taRef.current?.focus()
+    // На сенсорных экранах фокус не ставим вовсе: он утаскивал страницу вниз,
+    // к полю ввода, и открывал клавиатуру ещё до того, как человек успевал
+    // прочитать вопрос. На десктопе фокус удобен, но с preventScroll —
+    // иначе браузер точно так же подкручивает страницу к полю.
+    if (window.matchMedia('(pointer: coarse)').matches) return
+    taRef.current?.focus({ preventScroll: true })
   }, [step])
 
   async function handleRefine() {
