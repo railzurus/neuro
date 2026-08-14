@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Headphones, ListChecks, PenLine, Sparkles } from 'lucide-react'
 import { RITUAL, ROLES, TOTAL_WORD_LIMIT } from '../data/roles'
@@ -5,9 +6,24 @@ import { SPEEDS, VOICES } from '../data/voices'
 import { RoleIconTile } from '../components/RoleIcon'
 import { StartConsentNote } from '../components/Legal'
 import { useStore } from '../store/useStore'
+import { getCreatedCount } from '../lib/stats'
+import { plural } from '../lib/refine'
 
 export default function Intro() {
   const setMode = useStore((s) => s.setMode)
+
+  // null — счётчик ещё не загрузился или API недоступно. В обоих случаях
+  // строка не показывается, чтобы не мигать заглушкой.
+  const [created, setCreated] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    getCreatedCount().then((n) => {
+      if (alive) setCreated(n)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // Плавно, а не прыжком: обычный якорь #method сработал бы мгновенно, и
   // не было бы понятно, что мы всё ещё на той же странице.
@@ -41,6 +57,15 @@ export default function Intro() {
           станет вашим проводником, мягко направляя к мечте и помогая обрести
           внутреннюю гармонию.
         </p>
+
+        {created !== null && (
+          <p className="mt-6 text-sm text-ink-500">
+            Уже создано{' '}
+            <span className="font-medium text-ink-900">
+              {plural(created, 'медитация', 'медитации', 'медитаций')}
+            </span>
+          </p>
+        )}
 
         {/* Два пути к тексту */}
         <div className="mt-9 grid gap-3 text-left sm:grid-cols-2">
