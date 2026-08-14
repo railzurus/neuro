@@ -56,8 +56,3 @@ export function normalizeVoiceId(v: string | undefined): string {
 export function voiceById(id: string): VoiceOption {
   return VOICES.find((v) => v.id === id) ?? VOICES[0]
 }
-
-/** Voice ids that are female — used only for the browser-speech fallback. */
-export const FEMALE_VOICE_IDS = new Set(
-  VOICES.filter((v) => v.gender === 'female').map((v) => v.id),
-)

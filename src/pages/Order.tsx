@@ -17,6 +17,7 @@ import {
   type Order,
 } from '../lib/orders'
 import { downloadMantra } from '../lib/deliver'
+import { VoiceError } from '../lib/audio'
 import { preloadMusic } from '../lib/audio'
 
 type LoadState = 'loading' | 'ready' | 'notfound' | 'error'
@@ -99,8 +100,10 @@ export default function OrderPage() {
         .catch(() => {})
     } catch (e) {
       console.error('[order] render failed', e)
+      // VoiceError объясняет причину точнее общей фразы: сбой синтеза стоит
+      // переждать минуту, а не жать кнопку подряд.
       setError(
-        e instanceof OrderError
+        e instanceof OrderError || e instanceof VoiceError
           ? e.message
           : 'Не удалось собрать запись. Попробуйте ещё раз.',
       )

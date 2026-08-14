@@ -7,7 +7,7 @@ import { plural, wordCount } from '../lib/refine'
 import { voiceById } from '../data/voices'
 import { PaymentConsentNote } from '../components/Legal'
 import { PRICE_RUB, createOrder, isValidEmail } from '../lib/orders'
-import { MantraSession, loadVoices, preloadMusic, previewText } from '../lib/audio'
+import { MantraSession, preloadMusic, previewText } from '../lib/audio'
 
 const WPM = 85
 
@@ -22,7 +22,7 @@ export default function Listen() {
   const sessionRef = useRef<MantraSession | null>(null)
   const [state, setState] = useState<PlayState>('idle')
   const [progress, setProgress] = useState(0)
-  const [ttsSupported, setTtsSupported] = useState(true)
+  const [playError, setPlayError] = useState('')
 
   // Шаги покупки: выбор → ввод адреса → подтверждение адреса → оплата.
   const [step, setStep] = useState<'idle' | 'email' | 'confirm'>('idle')
@@ -36,8 +36,6 @@ export default function Listen() {
   const seconds = Math.max(Math.round((words / WPM) * 60), 60)
 
   useEffect(() => {
-    setTtsSupported('speechSynthesis' in window)
-    loadVoices()
     preloadMusic()
     return () => sessionRef.current?.stop()
   }, [])
@@ -47,6 +45,7 @@ export default function Listen() {
     const session = new MantraSession()
     sessionRef.current = session
     setProgress(0)
+    setPlayError('')
     setState('preparing')
     // На сайте озвучиваем только короткое превью (~15 с); полный текст —
     // при скачивании. Это быстрее и экономит синтез.
@@ -54,6 +53,13 @@ export default function Listen() {
       onReady: () => setState('playing'),
       onProgress: (f) => setProgress(f),
       onEnd: () => setState('done'),
+      // Запасного голоса нет: при сбое синтеза показываем ошибку, а не
+      // подсовываем браузерную озвучку вместо настоящей записи.
+      onError: (message) => {
+        setState('idle')
+        setProgress(0)
+        setPlayError(message)
+      },
     })
   }
 
@@ -209,10 +215,9 @@ export default function Listen() {
         </button>
       )}
 
-      {!ttsSupported && (
+      {playError && (
         <p className="mt-6 rounded-xl border border-[#e7b3c2] bg-[#fceef2] p-4 text-sm text-[#c0507a]">
-          Ваш браузер не поддерживает синтез речи. Музыку альфа-волн можно
-          скачать ниже, а озвучку — подключив TTS-провайдера.
+          {playError}
         </p>
       )}
 

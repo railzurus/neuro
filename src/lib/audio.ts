@@ -1,5 +1,4 @@
 import { Mp3Encoder } from '@breezystack/lamejs'
-import { FEMALE_VOICE_IDS } from '../data/voices'
 import { prepareForTts } from './refine'
 
 /**
@@ -9,16 +8,16 @@ import { prepareForTts } from './refine'
  *    (`/music/alpha-tide.mp3`) is loaded, decoded, looped and played quietly
  *    under the voice. If it fails to load, we fall back to a live binaural
  *    beat (~10 Hz) generated with the Web Audio API — so there is always a bed.
- *  - Voice: the browser SpeechSynthesis API reads the user's own text at a slow,
- *    even pace (~85 words/min), split into sentences for reliable long-text
- *    playback and progress reporting.
+ *  - Voice: synthesized by Yandex SpeechKit through `api/tts.php` and decoded
+ *    into an AudioBuffer.
  *  - Mixing: live playback mixes voice + music through the Web Audio graph;
- *    downloads are rendered offline (music looped to length, voice overlaid if
- *    an audio buffer is provided) — no server or ffmpeg required.
+ *    downloads are rendered offline — no server or ffmpeg required.
  *
- * PROVIDER HOOK: once a TTS backend (Yandex SpeakKit) returns the voice as an
- * audio file, decode it to an AudioBuffer and pass it to `renderMix` — the
- * download then contains voice + music baked into one file.
+ * Запасного голоса нет намеренно. Раньше при сбое синтеза включался браузерный
+ * SpeechSynthesis, и человек вместо купленной записи слышал роботизированное
+ * чтение — то есть плохой результат выдавался за нормальный. Теперь сбой
+ * синтеза виден как ошибка: лучше попросить повторить попытку, чем отдать
+ * заведомо негодное аудио.
  */
 
 const MUSIC_URL = '/music/alpha-tide.mp3'
@@ -178,43 +177,6 @@ export function startBed(ctx: AudioContext): BedNodes {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Voice selection                                                    */
-/* ------------------------------------------------------------------ */
-
-let cachedVoices: SpeechSynthesisVoice[] = []
-
-export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
-  return new Promise((resolve) => {
-    const existing = speechSynthesis.getVoices()
-    if (existing.length) {
-      cachedVoices = existing
-      resolve(existing)
-      return
-    }
-    const handler = () => {
-      cachedVoices = speechSynthesis.getVoices()
-      resolve(cachedVoices)
-      speechSynthesis.removeEventListener('voiceschanged', handler)
-    }
-    speechSynthesis.addEventListener('voiceschanged', handler)
-    setTimeout(() => resolve(speechSynthesis.getVoices()), 1500)
-  })
-}
-
-const FEMALE_HINTS = ['female', 'милена', 'milena', 'alena', 'алёна', 'алена', 'katya', 'катя', 'women', 'zira', 'anna']
-const MALE_HINTS = ['male', 'юрий', 'yuri', 'pavel', 'павел', 'артём', 'artem', 'dmitry', 'дмитрий', 'guy', 'man']
-
-export function pickVoice(gender: 'female' | 'male'): SpeechSynthesisVoice | undefined {
-  const voices = cachedVoices.length ? cachedVoices : speechSynthesis.getVoices()
-  const ru = voices.filter((v) => /ru/i.test(v.lang))
-  const pool = ru.length ? ru : voices
-  const hints = gender === 'female' ? FEMALE_HINTS : MALE_HINTS
-  const byHint = pool.find((v) => hints.some((h) => v.name.toLowerCase().includes(h)))
-  if (byHint) return byHint
-  return pool[0]
-}
-
-/* ------------------------------------------------------------------ */
 /*  Mantra session (music bed + narration together)                    */
 /* ------------------------------------------------------------------ */
 
@@ -225,10 +187,9 @@ export interface SessionCallbacks {
   onReady?: () => void
   onProgress?: (fraction: number) => void
   onEnd?: () => void
+  /** Синтез не удался. Воспроизведения не будет — показать ошибку. */
+  onError?: (message: string) => void
 }
-
-/** Target ~85 words/min. Browser rate 1 ≈ ~150 wpm, so ~0.55. */
-export const SLOW_RATE = 0.55
 
 function splitSentences(text: string): string[] {
   return text
@@ -367,10 +328,16 @@ function concatBuffers(ctx: BaseAudioContext, buffers: AudioBuffer[], gapSec: nu
   return out
 }
 
+/** Сбой синтеза. Текст сообщения предназначен пользователю. */
+export class VoiceError extends Error {}
+
 /**
  * Synthesize the whole text into one voice AudioBuffer via the SpeakKit proxy.
- * Returns null on any failure (no key configured, network, decode) so callers
- * can fall back to the browser SpeechSynthesis voice.
+ *
+ * Бросает VoiceError при любом сбое: ключ не настроен, сеть, таймаут, отказ
+ * декодирования. Раньше здесь возвращался null, и вызывающий код молча
+ * подставлял браузерный голос или собирал запись вообще без голоса —
+ * пользователь получал негодный результат вместо честной ошибки.
  *
  * Перед синтезом текст проходит техническую подготовку (`prepareForTts`):
  * ударения, числа прописью, разбивка на фразы и разметка пауз. Наружу этот
@@ -381,10 +348,22 @@ export async function synthesizeVoice(
   voice: string,
   speed: number,
   orderToken?: string,
-): Promise<AudioBuffer | null> {
+): Promise<AudioBuffer> {
   const key = voice + '@' + speed + '::' + text
   const cached = voiceBufferCache.get(key)
   if (cached) return cached
+
+  let chunks: string[]
+  try {
+    chunks = chunkText(await prepareForTts(text))
+  } catch (e) {
+    console.warn('[synthesizeVoice] подготовка текста не удалась:', e)
+    throw new VoiceError('Не удалось подготовить текст к озвучке. Попробуйте ещё раз.')
+  }
+
+  if (!chunks.length) {
+    throw new VoiceError('Текст пустой — озвучивать нечего.')
+  }
 
   try {
     // Decode with an OfflineAudioContext: it doesn't count against the live
@@ -392,16 +371,17 @@ export async function synthesizeVoice(
     // far more reliable than spinning up a real AudioContext per synthesis.
     const OAC = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext
     const ctx: BaseAudioContext = new OAC(2, 1, 44100)
-    const chunks = chunkText(await prepareForTts(text))
-    if (!chunks.length) return null
     const buffers: AudioBuffer[] = []
     for (const c of chunks) buffers.push(await ttsChunk(ctx, c, voice, speed, orderToken))
     const merged = buffers.length === 1 ? buffers[0] : concatBuffers(ctx, buffers, CHUNK_GAP)
     voiceBufferCache.set(key, merged)
     return merged
   } catch (e) {
-    console.warn('[synthesizeVoice] SpeakKit unavailable, using browser voice:', e)
-    return null
+    console.warn('[synthesizeVoice] синтез не удался:', e)
+    throw new VoiceError(
+      'Не удалось синтезировать голос. Такое бывает при перебоях у провайдера — ' +
+        'попробуйте ещё раз через минуту.',
+    )
   }
 }
 
@@ -410,9 +390,6 @@ export class MantraSession {
   private bed: BedNodes | null = null
   private voiceSrc: AudioBufferSourceNode | null = null
   private progressTimer: ReturnType<typeof setInterval> | null = null
-  private mode: 'buffer' | 'speech' | null = null
-  private sentences: string[] = []
-  private idx = 0
   private stopped = false
   private cb: SessionCallbacks = {}
 
@@ -424,31 +401,29 @@ export class MantraSession {
     this.stop() // clean any previous run
     this.stopped = false
     this.cb = cb
-    // Gender is only needed for the browser-speech fallback.
-    const gender: 'female' | 'male' = FEMALE_VOICE_IDS.has(voice) ? 'female' : 'male'
 
     const AC = window.AudioContext || (window as any).webkitAudioContext
     this.ctx = new AC()
 
-    // Prefer real SpeakKit voice (mixable + downloadable); if unavailable,
-    // fall back to the browser SpeechSynthesis voice.
+    // Голос только из SpeechKit. Не получилось — сообщаем об ошибке и молчим:
+    // запасного голоса нет намеренно, см. комментарий в шапке файла.
     this.cb.onPreparing?.()
-    synthesizeVoice(text, voice, speed).then((voiceBuffer) => {
-      if (this.stopped || !this.ctx) return
-      this.initBed().then(() => {
+    synthesizeVoice(text, voice, speed)
+      .then(async (voiceBuffer) => {
         if (this.stopped || !this.ctx) return
-        if (voiceBuffer) {
-          this.mode = 'buffer'
-          this.playBuffer(voiceBuffer)
-        } else {
-          this.mode = 'speech'
-          this.sentences = splitSentences(text)
-          this.idx = 0
-          this.cb.onReady?.()
-          setTimeout(() => this.speakNext(gender), VOICE_OFFSET * 1000)
-        }
+        await this.initBed()
+        if (this.stopped || !this.ctx) return
+        this.playBuffer(voiceBuffer)
       })
-    })
+      .catch((e: unknown) => {
+        if (this.stopped) return
+        const message =
+          e instanceof VoiceError
+            ? e.message
+            : 'Не удалось воспроизвести запись. Попробуйте ещё раз через минуту.'
+        this.stop()
+        this.cb.onError?.(message)
+      })
   }
 
   private async initBed() {
@@ -485,38 +460,6 @@ export class MantraSession {
     }
   }
 
-  private speakNext(gender: 'female' | 'male') {
-    if (this.stopped) return
-    if (this.idx >= this.sentences.length) {
-      this.finish()
-      return
-    }
-    const sentence = this.sentences[this.idx]
-    const u = new SpeechSynthesisUtterance(sentence)
-    const voice = pickVoice(gender)
-    if (voice) {
-      u.voice = voice
-      u.lang = voice.lang
-    } else {
-      u.lang = 'ru-RU'
-    }
-    u.rate = SLOW_RATE
-    u.pitch = gender === 'male' ? 0.92 : 1.0
-    u.volume = 1
-    u.onend = () => {
-      if (this.stopped) return
-      this.idx += 1
-      this.cb.onProgress?.(this.idx / this.sentences.length)
-      setTimeout(() => this.speakNext(gender), 900)
-    }
-    u.onerror = () => {
-      if (this.stopped) return
-      this.idx += 1
-      setTimeout(() => this.speakNext(gender), 300)
-    }
-    speechSynthesis.speak(u)
-  }
-
   private finish() {
     this.clearTimer()
     this.cb.onProgress?.(1)
@@ -526,25 +469,17 @@ export class MantraSession {
   }
 
   pause() {
-    // Suspend the context so the MUSIC pauses in both modes; in speech mode
-    // also pause the browser utterance (it isn't routed through the context).
+    // Голос и музыка идут через один контекст, поэтому останавливается всё.
     this.ctx?.suspend()
-    if (this.mode === 'speech') speechSynthesis.pause()
   }
 
   resume() {
     this.ctx?.resume()
-    if (this.mode === 'speech') speechSynthesis.resume()
   }
 
   stop() {
     this.stopped = true
     this.clearTimer()
-    try {
-      speechSynthesis.cancel()
-    } catch {
-      /* ignore */
-    }
     try {
       this.voiceSrc?.stop()
     } catch {
@@ -553,7 +488,6 @@ export class MantraSession {
     this.voiceSrc = null
     this.bed?.stop(0.4)
     this.bed = null
-    this.mode = null
     this.releaseCtx(500)
   }
 
