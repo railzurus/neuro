@@ -105,7 +105,12 @@ export default function Intro() {
         <p className="mt-8 font-serif text-2xl text-brand">
           Реальность — отражение наших представлений о ней.
         </p>
-        <div className="mt-4 space-y-4">
+        {/*
+          Выключка по формату: без неё рваный правый край на длинных абзацах
+          выглядит неопрятно. hyphens-auto обязателен — иначе выключка растянет
+          пробелы, и в русском тексте появятся «дыры» между словами.
+        */}
+        <div className="mt-4 space-y-4 hyphens-auto text-justify">
           {MANIFESTO.map((p, i) => (
             <p key={i} className="text-ink-600 leading-relaxed">
               {p}

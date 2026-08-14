@@ -14,32 +14,66 @@
 
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
-      (function (m, e, t, r, i, k, a) {
-        m[i] =
-          m[i] ||
-          function () {
-            (m[i].a = m[i].a || []).push(arguments)
-          }
-        m[i].l = 1 * new Date()
-        for (var j = 0; j < document.scripts.length; j++) {
-          if (document.scripts[j].src === r) {
-            return
-          }
-        }
-        ;(k = e.createElement(t)),
-          (a = e.getElementsByTagName(t)[0]),
-          (k.async = 1),
-          (k.src = r),
-          a.parentNode.insertBefore(k, a)
-      })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js?id=111091612', 'ym')
+      // Счётчик поднимаем только на боевом домене: иначе визиты с локального
+      // дев-сервера попадают в статистику. На localhost window.ym остаётся
+      // неопределённым — вызовы в App.tsx идут через ?., это безопасно.
+      var ymHost = location.hostname
+      var ymLocal =
+        ymHost === 'localhost' ||
+        ymHost === '127.0.0.1' ||
+        ymHost === '[::1]' ||
+        ymHost.endsWith('.local')
 
-      ym(111091612, 'init', {
-        ssr: true,
-        webvisor: true,
-        clickmap: true,
-        ecommerce: 'dataLayer',
-        accurateTrackBounce: true,
-        trackLinks: true,
+      if (!ymLocal) {
+        ;(function (m, e, t, r, i, k, a) {
+          m[i] =
+            m[i] ||
+            function () {
+              (m[i].a = m[i].a || []).push(arguments)
+            }
+          m[i].l = 1 * new Date()
+          for (var j = 0; j < document.scripts.length; j++) {
+            if (document.scripts[j].src === r) {
+              return
+            }
+          }
+          ;(k = e.createElement(t)),
+            (a = e.getElementsByTagName(t)[0]),
+            (k.async = 1),
+            (k.src = r),
+            a.parentNode.insertBefore(k, a)
+        })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js?id=111091612', 'ym')
+
+        ym(111091612, 'init', {
+          ssr: true,
+          webvisor: true,
+          clickmap: true,
+          ecommerce: 'dataLayer',
+          accurateTrackBounce: true,
+          trackLinks: true,
+        })
+      }
+
+      // Убираем служебные параметры Метрики (?_ym_debug=1 и подобные) из
+      // адресной строки: сайт их не ставит, они приезжают из проверки счётчика
+      // в интерфейсе Метрики и потом висят в адресе, а при перезагрузке ещё и
+      // уезжают в отчёты отдельной страницей.
+      //
+      // Ждём события load: tag.js грузится асинхронно, и до этого момента он
+      // параметр ещё не прочитал. Почистить раньше — значит сломать сам режим
+      // отладки, ради которого параметр и добавляют.
+      window.addEventListener('load', function () {
+        var url = new URL(location.href)
+        var removed = false
+        Array.from(url.searchParams.keys()).forEach(function (key) {
+          if (key.indexOf('_ym_') === 0) {
+            url.searchParams.delete(key)
+            removed = true
+          }
+        })
+        if (removed) {
+          history.replaceState(null, '', url.pathname + url.search + url.hash)
+        }
       })
     </script>
     <!-- /Yandex.Metrika counter -->
