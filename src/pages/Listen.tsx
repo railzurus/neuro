@@ -149,7 +149,7 @@ export default function Listen() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 pb-24 text-center">
-      <h1 className="font-serif text-4xl text-ink-900">Ваша мантра готова</h1>
+      <h1 className="font-serif text-4xl text-ink-900">Ваша медитация готова</h1>
       <p className="mx-auto mt-2 max-w-md text-ink-600 leading-relaxed">
         Голос <span className="text-ink-900">{voiceById(voice).label}</span> читает
         ваш текст в медленном темпе на фоне альфа-волн. Здесь звучит короткое
