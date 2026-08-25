@@ -25,12 +25,6 @@ export default function Intro() {
     }
   }, [])
 
-  // Плавно, а не прыжком: обычный якорь #method сработал бы мгновенно, и
-  // не было бы понятно, что мы всё ещё на той же странице.
-  function scrollToMethod() {
-    document.getElementById('method')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   return (
     <div className="mx-auto max-w-3xl px-6 pb-20">
       {/* Hero */}
@@ -78,11 +72,12 @@ export default function Intro() {
             cta="Вставить текст"
           />
           <PathCard
-            onClick={scrollToMethod}
+            to="/compose"
+            onClick={() => setMode('roles')}
             icon={<ListChecks className="h-5 w-5" />}
             title="Поможем описать образ"
             body="Проведём по девяти вопросам о жизни вашей мечты — из ответов соберётся текст."
-            cta="Как это устроено"
+            cta="Пройти по вопросам"
             primary
           />
         </div>
@@ -244,11 +239,7 @@ export default function Intro() {
   )
 }
 
-/**
- * Карточка одного из путей к тексту. С `to` — ссылка на страницу, без него —
- * кнопка: путь «поможем описать образ» никуда не уводит, а прокручивает к
- * описанию метода на этой же странице.
- */
+/** Карточка одного из путей к тексту: ссылка на страницу этого пути. */
 function PathCard({
   to,
   onClick,
@@ -258,7 +249,7 @@ function PathCard({
   cta,
   primary = false,
 }: {
-  to?: string
+  to: string
   onClick: () => void
   icon: React.ReactNode
   title: string
@@ -294,17 +285,9 @@ function PathCard({
     </>
   )
 
-  if (to) {
-    return (
-      <Link to={to} onClick={onClick} className={className}>
-        {inner}
-      </Link>
-    )
-  }
-
   return (
-    <button type="button" onClick={onClick} className={className}>
+    <Link to={to} onClick={onClick} className={className}>
       {inner}
-    </button>
+    </Link>
   )
 }
