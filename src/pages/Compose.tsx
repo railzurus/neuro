@@ -120,8 +120,8 @@ export default function Compose() {
             rows={7}
             className={`w-full resize-none rounded-2xl border bg-white p-5 text-[15px] leading-relaxed text-ink-900 placeholder:text-ink-300 shadow-soft transition-colors focus:border-brand/60 ${
               // Тот же розовый, что и у прочих предупреждений: раньше здесь
-              // был blob-blush, но после перехода на бирюзу этот оттенок стал
-              // фоновым голубым и перестал читаться как ошибка.
+              // был blob-blush, но этот оттенок стал тёплым фоновым и перестал
+              // читаться как ошибка — тем более рядом с оранжевым брендом.
               overLimit ? 'border-[#e7b3c2]' : 'border-black/[0.07]'
             }`}
           />

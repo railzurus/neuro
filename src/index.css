@@ -14,7 +14,7 @@ body,
 
 body {
   margin: 0;
-  background-color: #f9fbfa;
+  background-color: #fffaf6;
   color: #241f38;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -33,10 +33,10 @@ body {
   height: 85vh;
   z-index: -1;
   background:
-    radial-gradient(38% 48% at 18% 18%, rgba(189, 228, 222, 0.28), transparent 70%),
-    radial-gradient(34% 44% at 82% 12%, rgba(207, 230, 239, 0.2), transparent 70%),
-    radial-gradient(42% 52% at 62% 58%, rgba(174, 219, 216, 0.18), transparent 72%),
-    radial-gradient(30% 40% at 40% 80%, rgba(216, 239, 230, 0.18), transparent 70%);
+    radial-gradient(38% 48% at 18% 18%, rgba(255, 212, 176, 0.30), transparent 70%),
+    radial-gradient(34% 44% at 82% 12%, rgba(255, 227, 203, 0.22), transparent 70%),
+    radial-gradient(42% 52% at 62% 58%, rgba(255, 192, 154, 0.20), transparent 72%),
+    radial-gradient(30% 40% at 40% 80%, rgba(255, 220, 188, 0.20), transparent 70%);
   filter: blur(20px);
   pointer-events: none;
 }
@@ -54,7 +54,7 @@ body {
 
   .btn-primary {
     @apply inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-medium text-white shadow-glow transition-transform;
-    background-image: linear-gradient(135deg, #0f8480 0%, #35b3a5 100%);
+    background-image: linear-gradient(135deg, #ff6700 0%, #ff9445 100%);
   }
   .btn-primary:enabled:hover,
   .btn-primary:not(:disabled):hover {
@@ -76,14 +76,14 @@ body {
 /* Thin, calm scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(15, 132, 128, 0.35) transparent;
+  scrollbar-color: rgba(255, 103, 0, 0.35) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(15, 132, 128, 0.28);
+  background: rgba(255, 103, 0, 0.28);
   border-radius: 999px;
 }
 
@@ -93,5 +93,5 @@ input {
 }
 
 ::selection {
-  background: rgba(15, 132, 128, 0.18);
+  background: rgba(255, 103, 0, 0.18);
 }

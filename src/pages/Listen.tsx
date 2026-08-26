@@ -172,7 +172,7 @@ export default function Listen() {
           onClick={onOrbClick}
           disabled={isPreparing}
           className="relative grid h-20 w-20 place-items-center rounded-full text-white shadow-glow transition-transform hover:scale-105 disabled:hover:scale-100"
-          style={{ backgroundImage: 'linear-gradient(135deg,#0f8480,#35b3a5)' }}
+          style={{ backgroundImage: 'linear-gradient(135deg,#ff6700,#ff9445)' }}
           aria-label={isPreparing ? 'Готовим' : isPlaying ? 'Пауза' : 'Играть'}
         >
           {isPreparing ? (

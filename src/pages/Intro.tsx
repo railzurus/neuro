@@ -41,7 +41,7 @@ export default function Intro() {
         <h1 className="font-serif text-[2rem] sm:text-5xl leading-[1.1] text-ink-900 animate-fadeup">
           Создайте свою
           <br />
-          <span className="bg-gradient-to-r from-brand to-[#4cc0b2] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-brand to-[#ff9445] bg-clip-text text-transparent">
             идеальную медитацию
           </span>
         </h1>
