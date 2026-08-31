@@ -8,7 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/textlimit.php';
 
 /** Стоимость услуги, ₽ (зафиксирована в Пользовательском соглашении). */
-const ORDER_PRICE_RUB = 499;
+const ORDER_PRICE_RUB = 299;
 
 /** Сколько дней живёт ссылка на заказ. */
 const ORDER_TTL_DAYS = 14;
@@ -32,7 +32,8 @@ const ORDER_DOWNLOAD_LIMIT = 10;
  */
 const ORDER_DOC_VERSIONS = [
     'privacy' => '2026-08-03',
-    'terms' => '2026-08-03',
+    // 31.08.2026 — цена в разделе «Стоимость» снижена с 499 ₽ до 299 ₽.
+    'terms' => '2026-08-31',
     'consent' => '2026-08-03',
 ];
 

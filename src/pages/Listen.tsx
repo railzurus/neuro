@@ -6,7 +6,13 @@ import { TOTAL_WORD_LIMIT } from '../data/roles'
 import { plural, wordCount } from '../lib/refine'
 import { voiceById } from '../data/voices'
 import { PaymentConsentNote } from '../components/Legal'
-import { PRICE_RUB, createOrder, isValidEmail } from '../lib/orders'
+import {
+  PRICE_DISCOUNT_PCT,
+  PRICE_RUB,
+  PRICE_RUB_OLD,
+  createOrder,
+  isValidEmail,
+} from '../lib/orders'
 import { MantraSession, preloadMusic, previewText } from '../lib/audio'
 
 const WPM = 85
@@ -228,9 +234,25 @@ export default function Listen() {
         {step === 'idle' && (
           <>
             <p className="mx-auto mt-2 max-w-md text-sm text-ink-500 leading-relaxed">
-              Полная запись целиком — {PRICE_RUB} ₽. Чтобы слушать её каждый вечер
-              в течение 30 дней.
+              Полная запись целиком. Чтобы слушать её каждый вечер в течение
+              30 дней.
             </p>
+
+            {/* Цена. Старая — зачёркнутой рядом с новой: она реально
+                действовала до 31.08.2026, см. PRICE_RUB_OLD. */}
+            <div className="mt-5 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
+              <span className="text-lg text-ink-400 line-through decoration-ink-300 decoration-2">
+                {PRICE_RUB_OLD} ₽
+              </span>
+              <span className="font-serif text-4xl leading-none text-ink-900">
+                {PRICE_RUB} ₽
+              </span>
+              <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600">
+                −{PRICE_DISCOUNT_PCT}%
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs text-ink-400">Новая цена</p>
+
             <button onClick={() => setStep('email')} className="btn-primary mt-5">
               <CreditCard className="h-4 w-4" />
               Купить
@@ -292,6 +314,14 @@ export default function Listen() {
                 )}
                 {paying ? 'Оформляем заказ…' : `Перейти к оплате · ${PRICE_RUB} ₽`}
               </button>
+              {!paying && (
+                <p className="text-xs text-ink-400">
+                  вместо{' '}
+                  <span className="line-through decoration-ink-300">
+                    {PRICE_RUB_OLD} ₽
+                  </span>
+                </p>
+              )}
               <button
                 onClick={() => setStep('email')}
                 className="text-sm text-ink-500 hover:text-ink-900"
